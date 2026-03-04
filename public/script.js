@@ -2,9 +2,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const socket = io();
   console.log("✅ script.js loaded");
 
+
+  // ===== WebRTC signaling للشاشة =====
+socket.on("viewer:join", () => {
+  // نبلغ كل المقدمين/الكل أن فيه مشاهد جديد (بنستعمله عند المقدم فقط)
+  io.emit("viewer:joined", { viewerId: socket.id });
+});
+
+socket.on("webrtc:signal", ({ to, signal }) => {
+  if (!to || !signal) return;
+  io.to(to).emit("webrtc:signal", { from: socket.id, signal });
+});
+
   // ====== معرفي ======
   let myId = null;
   socket.on("connect", () => { myId = socket.id; });
+
+  
 
   // ====== عام ======
   const statusText = document.getElementById("status");
@@ -72,6 +86,142 @@ document.addEventListener("DOMContentLoaded", () => {
   const openLeftBtn = document.getElementById("openLeftBtn");
   const lockRightBtn = document.getElementById("lockRightBtn");
   const openRightBtn = document.getElementById("openRightBtn");
+
+  // ===== WebRTC signaling للشاشة =====
+socket.on("viewer:join", () => {
+  // نبلغ كل المقدمين/الكل أن فيه مشاهد جديد (بنستعمله عند المقدم فقط)
+  io.emit("viewer:joined", { viewerId: socket.id });
+});
+
+const shareScreenBtn = document.getElementById("shareScreenBtn");
+
+if (shareScreenBtn) {
+  shareScreenBtn.onclick = async () => {
+    try {
+      hostStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+
+      // عرضها عند المقدم
+      if (stageVideo) {
+        stageVideo.srcObject = hostStream;
+        stageVideo.muted = true;
+        await stageVideo.play().catch(()=>{});
+      }
+
+      // لو وقفت المشاركة من النظام
+      hostStream.getVideoTracks()[0].addEventListener("ended", () => {
+        stopHostingScreen();
+      });
+
+      // أي ضيف جديد يدخل بعد التشغيل لازم نرسل له
+      // (الضيوف بيعطوننا viewer:joined)
+      console.log("✅ Screen sharing started");
+    } catch (e) {
+      console.log("❌ share error", e);
+      alert("ما قدرت أشارك الشاشة");
+    }
+  };
+}
+
+function stopHostingScreen() {
+  // اقفل اتصالات الضيوف
+  Object.values(hostPeers).forEach(p => {
+    try { p.destroy(); } catch {}
+  });
+  for (const k in hostPeers) delete hostPeers[k];
+
+  // وقف الستريم
+  if (hostStream) {
+    hostStream.getTracks().forEach(t => t.stop());
+    hostStream = null;
+  }
+
+  // فضّي الفيديو
+  if (stageVideo) stageVideo.srcObject = null;
+
+  console.log("🧹 Screen sharing stopped");
+}
+
+socket.on("viewer:joined", ({ viewerId }) => {
+  // لا تسوي شيء إذا ما عندك ستريم شغال
+  if (!hostStream) return;
+
+  // مهم: لا تسوي peer لنفسك
+  if (!viewerId || viewerId === socket.id) return;
+
+  // إذا موجود قبل لا تعيد
+  if (hostPeers[viewerId]) return;
+
+  const peer = new SimplePeer({
+    initiator: true,
+    trickle: false,
+    stream: hostStream,
+  });
+
+  hostPeers[viewerId] = peer;
+
+  peer.on("signal", (signal) => {
+    socket.emit("webrtc:signal", { to: viewerId, signal });
+  });
+
+  peer.on("close", () => {
+    delete hostPeers[viewerId];
+  });
+
+  peer.on("error", (err) => {
+    console.log("peer error", err);
+    delete hostPeers[viewerId];
+  });
+});
+
+// الضيف يقول: أنا مشاهد
+socket.emit("viewer:join");
+
+socket.on("webrtc:signal", async ({ from, signal }) => {
+  // ===== الضيف =====
+  // إذا ما عنده peer، ينشئ واحد (غير initiator)
+  if (!viewerPeer) {
+    viewerPeer = new SimplePeer({
+      initiator: false,
+      trickle: false,
+    });
+
+    viewerPeer.on("signal", (sig) => {
+      socket.emit("webrtc:signal", { to: from, signal: sig });
+    });
+
+    viewerPeer.on("stream", async (stream) => {
+      if (stageVideo) {
+        stageVideo.srcObject = stream;
+        stageVideo.muted = true; // عشان autoplay
+        await stageVideo.play().catch(()=>{});
+      }
+    });
+
+    viewerPeer.on("close", () => {
+      viewerPeer = null;
+    });
+
+    viewerPeer.on("error", (e) => {
+      console.log("viewerPeer error", e);
+      viewerPeer = null;
+    });
+  }
+
+  // استقبل الإشارة
+  try {
+    viewerPeer.signal(signal);
+  } catch (e) {
+    console.log("signal error", e);
+  }
+});
+
+socket.on("webrtc:signal", ({ to, signal }) => {
+  if (!to || !signal) return;
+  io.to(to).emit("webrtc:signal", { from: socket.id, signal });
+});
 
   // ====== زر اللعبة ======
   const buzzBtn = document.getElementById("buzzBtn");
