@@ -3,6 +3,17 @@ const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
 
+// ===== WebRTC signaling للشاشة =====
+socket.on("viewer:join", () => {
+  // نبلغ كل المقدمين/الكل أن فيه مشاهد جديد (بنستعمله عند المقدم فقط)
+  io.emit("viewer:joined", { viewerId: socket.id });
+});
+
+socket.on("webrtc:signal", ({ to, signal }) => {
+  if (!to || !signal) return;
+  io.to(to).emit("webrtc:signal", { from: socket.id, signal });
+});
+
 app.use(express.static("public"));
 
 // ===== الطلبات =====
