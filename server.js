@@ -65,7 +65,65 @@ let hostId = null;
 let mediaState = { type: "none", src: "" }; // none | image | url | screen
 
 io.on("connection", (socket) => {
-  
+  // ===== Host auth + ICE servers =====
+let hostId = null;
+
+socket.on("registerHost", () => {
+  hostId = socket.id;
+});
+
+socket.emit("iceServers", [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+
+  // ✅ TURN (لازم تحطه من ENV في Render) — مثال:
+  // { urls: process.env.TURN_URL, username: process.env.TURN_USER, credential: process.env.TURN_PASS }
+].filter(Boolean));
+// ===== media control: host only =====
+let mediaState = { type: "none", src: "" };
+socket.emit("mediaState", mediaState);
+
+socket.on("setMedia", (state) => {
+  if (socket.id !== hostId) return; // ✅ فقط المقدم
+  if (!state || !state.type) return;
+  mediaState = { type: state.type, src: String(state.src || "") };
+  io.emit("mediaState", mediaState);
+});
+
+// ===== WebRTC relay =====
+socket.on("screenJoin", () => {
+  if (!hostId) return;
+  io.to(hostId).emit("screenJoin", { guestId: socket.id });
+});
+
+socket.on("webrtcOffer", ({ to, sdp }) => {
+  if (socket.id !== hostId) return; // offer من المقدم فقط
+  io.to(to).emit("webrtcOffer", { from: socket.id, sdp });
+});
+
+socket.on("webrtcAnswer", ({ to, sdp }) => {
+  io.to(to).emit("webrtcAnswer", { from: socket.id, sdp });
+});
+
+socket.on("webrtcIce", ({ to, ice }) => {
+  io.to(to).emit("webrtcIce", { from: socket.id, ice });
+});
+  // ===== WebRTC signaling relay (مهم للتواصل بين الأجهزة) =====
+socket.on("webrtcOffer", ({ to, sdp }) => {
+  if (!to || !sdp) return;
+  io.to(to).emit("webrtcOffer", { from: socket.id, sdp });
+});
+
+socket.on("webrtcAnswer", ({ to, sdp }) => {
+  if (!to || !sdp) return;
+  io.to(to).emit("webrtcAnswer", { from: socket.id, sdp });
+});
+
+socket.on("webrtcIce", ({ to, ice }) => {
+  if (!to || !ice) return;
+  io.to(to).emit("webrtcIce", { from: socket.id, ice });
+});
+
   socket.on("registerHost", () => {
   hostSocketId = socket.id;
   console.log("👑 Host registered:", hostSocketId);
