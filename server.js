@@ -29,6 +29,12 @@ let buzzState = {
 
 let buzzerTimer = null;
 
+let hostSocketId = null;
+
+function isHost(socket) {
+  return socket.id === hostSocketId;
+}
+
 // أرسل الحالة للجميع
 function emitBuzzState() {
   io.emit("buzzState", buzzState);
@@ -59,7 +65,13 @@ let hostId = null;
 let mediaState = { type: "none", src: "" }; // none | image | url | screen
 
 io.on("connection", (socket) => {
+  
+  socket.on("registerHost", () => {
+  hostSocketId = socket.id;
+  console.log("👑 Host registered:", hostSocketId);
+});
 console.log("🟢 connected:", socket.id);
+
 
 // ===== WebRTC signaling للشاشة =====
 socket.on("viewer:join", () => {
