@@ -27,6 +27,41 @@ let buzzState = {
 
 let buzzerTimer = null;
 
+// ====== MEDIA / SCREEN (الجديد) ======
+let hostSocketId = null; // المقدم الحالي
+let mediaState = { type: "none", src: "" }; // none | image | url | screen
+
+function parseTurnUrls(str) {
+  // يسمح لك تحط أكثر من رابط مفصول بفاصلة
+  return String(str || "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function buildIceServers() {
+  const servers = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+  ];
+
+  // TURN من ENV (Render)
+  // TURN_URLS مثال: "turn:global.relay.metered.ca:80?transport=udp,turn:global.relay.metered.ca:443?transport=tcp,turns:global.relay.metered.ca:443?transport=tcp"
+  const urls = parseTurnUrls(process.env.TURN_URLS);
+  const user = process.env.TURN_USER;
+  const pass = process.env.TURN_PASS;
+
+  if (urls.length && user && pass) {
+    servers.push({
+      urls,
+      username: user,
+      credential: pass,
+    });
+  }
+
+  return servers;
+}
+
 // أرسل الحالة للجميع
 function emitBuzzState() {
   io.emit("buzzState", buzzState);
@@ -52,70 +87,48 @@ function resetBuzz(full = false) {
   emitBuzzState();
 }
 
-/* =====================================================
-   ✅ MEDIA / SCREEN SHARE (FIXED)  (لا يمس باقي اللعبة)
-===================================================== */
-let hostId = null; // socket.id للمقدم
-let mediaState = { type: "none", src: "" }; // none | image | url | screen
-
-function getIceServers() {
-  const list = [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-  ];
-
-  // TURN من ENV (Render)
-  if (process.env.TURN_URL && process.env.TURN_USER && process.env.TURN_PASS) {
-    list.push({
-      urls: process.env.TURN_URL,
-      username: process.env.TURN_USER,
-      credential: process.env.TURN_PASS,
-    });
-  }
-
-  return list;
-}
-/* ===================================================== */
-
 io.on("connection", (socket) => {
   console.log("🟢 connected:", socket.id);
 
-  /* ======================
-     ✅ MEDIA / WEBRTC (Fixed)
-  ====================== */
-  // أرسل ICE + حالة الميديا لأي أحد يدخل
-  socket.emit("iceServers", getIceServers());
+  // ====== أرسل إعدادات ICE (STUN/TURN) لكل شخص ======
+  socket.emit("iceServers", buildIceServers());
+
+  // ====== MEDIA: أرسل الحالة الحالية أول ما يدخل ======
   socket.emit("mediaState", mediaState);
 
-  // تسجيل المقدم
+  // ====== تسجيل المقدم ======
   socket.on("registerHost", () => {
-    hostId = socket.id;
-    console.log("👑 Host registered:", hostId);
+    hostSocketId = socket.id;
+    console.log("👑 Host registered:", hostSocketId);
+
+    // لما يسجل نفسه مقدم نعطيه الحالة الحالية
     socket.emit("mediaState", mediaState);
   });
 
-  // تحكم الميديا: فقط المقدم
+  // ====== المقدم فقط يقدر يغير media ======
   socket.on("setMedia", (state) => {
-    if (socket.id !== hostId) return; // ✅ فقط المقدم
+    if (socket.id !== hostSocketId) return; // ✅ فقط المقدم
     if (!state || !state.type) return;
 
     mediaState = { type: state.type, src: String(state.src || "") };
     io.emit("mediaState", mediaState);
   });
 
-  // الضيف يطلب اتصال (مشاركة شاشة)
+  // ====== WebRTC signaling relay (Offer/Answer/ICE) ======
+  // الضيف يطلب اتصال شاشة
   socket.on("screenJoin", () => {
-    if (!hostId) return;
-    io.to(hostId).emit("screenJoin", { guestId: socket.id });
+    if (!hostSocketId) return;
+    io.to(hostSocketId).emit("screenJoin", { guestId: socket.id });
   });
 
-  // Relay إشارات WebRTC
+  // offer من المقدم فقط
   socket.on("webrtcOffer", ({ to, sdp }) => {
-    if (socket.id !== hostId) return; // offer من المقدم فقط
+    if (socket.id !== hostSocketId) return;
     if (!to || !sdp) return;
     io.to(to).emit("webrtcOffer", { from: socket.id, sdp });
   });
 
+  // answer من أي ضيف -> للمقدم
   socket.on("webrtcAnswer", ({ to, sdp }) => {
     if (!to || !sdp) return;
     io.to(to).emit("webrtcAnswer", { from: socket.id, sdp });
@@ -125,9 +138,8 @@ io.on("connection", (socket) => {
     if (!to || !ice) return;
     io.to(to).emit("webrtcIce", { from: socket.id, ice });
   });
-  /* ====================== */
 
-  // إرسال الحالة عند الدخول
+  // ====== إرسال الحالة عند الدخول (باقي مشروعك كما هو) ======
   socket.emit("teamLockStatus", teamChoiceLocked);
   socket.emit("teamSettings", teamSettings);
   socket.emit("updateRequests", joinRequests);
@@ -182,23 +194,16 @@ io.on("connection", (socket) => {
      ✅ قبول/رفض الطلبات
   ====================== */
   socket.on("acceptRequest", (id) => {
-    console.log("✅ acceptRequest from", socket.id, "target", id);
-
     io.to(id).emit("requestAccepted");
-
     joinRequests = joinRequests.filter((r) => r.id !== id);
     io.emit("updateRequests", joinRequests);
     io.emit("updatePlayers", players);
   });
 
   socket.on("rejectRequest", (id) => {
-    console.log("❌ rejectRequest from", socket.id, "target", id);
-
     io.to(id).emit("requestRejected");
-
     joinRequests = joinRequests.filter((r) => r.id !== id);
     delete players[id];
-
     io.emit("updateRequests", joinRequests);
     io.emit("updatePlayers", players);
   });
@@ -267,7 +272,7 @@ io.on("connection", (socket) => {
   /* ======================
      زر اللعبة (Buzz)
   ====================== */
-  socket.on("buzz", ({ name }) => {
+  socket.on("buzz", () => {
     const p = players[socket.id];
     if (!p) return;
 
@@ -278,15 +283,10 @@ io.on("connection", (socket) => {
 
     buzzState.locked = true;
     buzzState.lockedBy = { id: socket.id, name: p.name, team: p.team };
-
     emitBuzzState();
 
     const teamName = teamSettings[p.team].name;
-    io.emit("buzzedInfo", {
-      name: p.name,
-      teamKey: p.team,
-      teamName,
-    });
+    io.emit("buzzedInfo", { name: p.name, teamKey: p.team, teamName });
 
     let timeLeft = 5;
     io.emit("timer", timeLeft);
@@ -307,16 +307,12 @@ io.on("connection", (socket) => {
      حكم المقدم: صح/خطأ
   ====================== */
   socket.on("judgeAnswer", ({ correct }) => {
-    console.log("⚖️ server: judgeAnswer", correct);
-
     if (!buzzState.locked || !buzzState.lockedBy) return;
 
     const { id, team } = buzzState.lockedBy;
 
     if (correct === true) {
-      if (players[id]) {
-        players[id].correctCount = (players[id].correctCount || 0) + 1;
-      }
+      if (players[id]) players[id].correctCount = (players[id].correctCount || 0) + 1;
       io.emit("updatePlayers", players);
 
       resetBuzz(true);
@@ -346,10 +342,7 @@ io.on("connection", (socket) => {
   /* ======================
      تحكم المقدم بالزر (صور)
   ====================== */
-  socket.on("resetBuzz", () => {
-    console.log("🟥 server: resetBuzz received");
-    resetBuzz(true);
-  });
+  socket.on("resetBuzz", () => resetBuzz(true));
 
   socket.on("lockTeamBuzz", (team) => {
     if (team !== "left" && team !== "right") return;
@@ -378,9 +371,6 @@ io.on("connection", (socket) => {
     emitBuzzState();
   });
 
-  /* ======================
-     Reset القديم
-  ====================== */
   socket.on("reset", () => {
     buzzState.locked = false;
     buzzState.lockedBy = null;
@@ -395,26 +385,25 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    // حذف طلبات/لاعبين
     joinRequests = joinRequests.filter((r) => r.id !== socket.id);
     delete players[socket.id];
 
     io.emit("updateRequests", joinRequests);
     io.emit("updatePlayers", players);
 
-    // إذا اللي طق الزر طلع
     if (buzzState.lockedBy && buzzState.lockedBy.id === socket.id) {
       buzzState.locked = false;
       buzzState.lockedBy = null;
       emitBuzzState();
     }
 
-    // إذا المقدم طلع، نفك الميديا
-    if (socket.id === hostId) {
-      hostId = null;
+    // إذا المقدم طلع
+    if (socket.id === hostSocketId) {
+      hostSocketId = null;
+      // اختياري: ترجع الميديا فاضية إذا المقدم طلع
       mediaState = { type: "none", src: "" };
       io.emit("mediaState", mediaState);
-      console.log("👑 Host disconnected -> media reset");
+      console.log("👑 Host left, media cleared");
     }
 
     console.log("🔴 disconnected:", socket.id);
