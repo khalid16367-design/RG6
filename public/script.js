@@ -1,5 +1,11 @@
 document.addEventListener("DOMContentLoaded", () => {
   const socket = io();
+
+  // تسجيل المقدم
+if (document.getElementById("requestsContainer")) {
+  socket.emit("registerHost");
+}
+ 
   console.log("✅ script.js loaded");
 
 
@@ -807,7 +813,13 @@ if (isHost && btnShareScreen) btnShareScreen.onclick = startShare;
 socket.on("screenJoin", async ({ guestId }) => {
   if (!isHost || !hostStream || !guestId) return;
 
-  const pc = new RTCPeerConnection();
+  const pc = new RTCPeerConnection({
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
+  ]
+});
+  
   pcs[guestId] = pc;
 
   hostStream.getTracks().forEach(track => pc.addTrack(track, hostStream));
