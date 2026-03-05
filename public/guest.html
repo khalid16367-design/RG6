@@ -55,6 +55,22 @@
 
 </div>
 
+<!-- ✅ شاشة تم ضغط الزر (داخل الصفحة + بالنص) -->
+    <div id="buzzOverlay" class="buzz-panel hidden">
+      <div class="buzz-card">
+        <div class="buzz-title">تم ضغط الزر من قبل:</div>
+        <div class="buzz-sub" id="buzzInfo">...</div>
+        <div class="buzz-timer" id="buzzTimer">Timer: 0</div>
+        <div class="buzz-timeup hidden" id="buzzTimeUp">انتهى الوقت</div>
+      </div>
+    </div>
+
+    <!-- زر اللعبة -->
+    <div class="buzz-wrap">
+      <button id="buzzBtn" class="buzz-img buzz-red" aria-label="زر"></button>
+    </div>
+
+  </div>
     <!-- لوحة الفرق للضيف -->
     <div class="teams-wrapper guest-teams">
       <div class="team-card" id="gLeftCard">
@@ -76,22 +92,7 @@
       </div>
     </div>
 
-    <!-- ✅ شاشة تم ضغط الزر (داخل الصفحة + بالنص) -->
-    <div id="buzzOverlay" class="buzz-panel hidden">
-      <div class="buzz-card">
-        <div class="buzz-title">تم ضغط الزر من قبل:</div>
-        <div class="buzz-sub" id="buzzInfo">...</div>
-        <div class="buzz-timer" id="buzzTimer">Timer: 0</div>
-        <div class="buzz-timeup hidden" id="buzzTimeUp">انتهى الوقت</div>
-      </div>
-    </div>
-
-    <!-- زر اللعبة -->
-    <div class="buzz-wrap">
-      <button id="buzzBtn" class="buzz-img buzz-red" aria-label="زر"></button>
-    </div>
-
-  </div>
+    
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
