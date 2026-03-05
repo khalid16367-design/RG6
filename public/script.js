@@ -1,30 +1,31 @@
 document.addEventListener("DOMContentLoaded", () => {
   const socket = io();
-
-  // تسجيل المقدم
-if (document.getElementById("requestsContainer")) {
-  socket.emit("registerHost");
-}
- 
   console.log("✅ script.js loaded");
 
+  // ===== تحديد هل أنا مقدم؟ =====
+  const isHost = !!document.getElementById("requestsContainer");
+  if (isHost) socket.emit("registerHost");
 
-  // ===== WebRTC signaling للشاشة =====
-socket.on("viewer:join", () => {
-  // نبلغ كل المقدمين/الكل أن فيه مشاهد جديد (بنستعمله عند المقدم فقط)
-  io.emit("viewer:joined", { viewerId: socket.id });
-});
+  // ===== ICE (STUN/TURN) =====
+  // افتراضي STUN فقط (يشتغل غالبًا داخل نفس الشبكة)
+  // عشان يشتغل خارج نفس الشبكة لازم TURN (بنستلمه من السيرفر عبر iceServers)
+  let ICE_SERVERS = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+  ];
 
-socket.on("webrtc:signal", ({ to, signal }) => {
-  if (!to || !signal) return;
-  io.to(to).emit("webrtc:signal", { from: socket.id, signal });
-});
+  socket.on("iceServers", (servers) => {
+    if (Array.isArray(servers) && servers.length) {
+      ICE_SERVERS = servers;
+      console.log("🧊 ICE servers updated from server:", ICE_SERVERS);
+    }
+  });
 
   // ====== معرفي ======
   let myId = null;
-  socket.on("connect", () => { myId = socket.id; });
-
-  
+  socket.on("connect", () => {
+    myId = socket.id;
+  });
 
   // ====== عام ======
   const statusText = document.getElementById("status");
@@ -93,142 +94,6 @@ socket.on("webrtc:signal", ({ to, signal }) => {
   const lockRightBtn = document.getElementById("lockRightBtn");
   const openRightBtn = document.getElementById("openRightBtn");
 
-  // ===== WebRTC signaling للشاشة =====
-socket.on("viewer:join", () => {
-  // نبلغ كل المقدمين/الكل أن فيه مشاهد جديد (بنستعمله عند المقدم فقط)
-  io.emit("viewer:joined", { viewerId: socket.id });
-});
-
-const shareScreenBtn = document.getElementById("shareScreenBtn");
-
-if (shareScreenBtn) {
-  shareScreenBtn.onclick = async () => {
-    try {
-      hostStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false,
-      });
-
-      // عرضها عند المقدم
-      if (stageVideo) {
-        stageVideo.srcObject = hostStream;
-        stageVideo.muted = true;
-        await stageVideo.play().catch(()=>{});
-      }
-
-      // لو وقفت المشاركة من النظام
-      hostStream.getVideoTracks()[0].addEventListener("ended", () => {
-        stopHostingScreen();
-      });
-
-      // أي ضيف جديد يدخل بعد التشغيل لازم نرسل له
-      // (الضيوف بيعطوننا viewer:joined)
-      console.log("✅ Screen sharing started");
-    } catch (e) {
-      console.log("❌ share error", e);
-      alert("ما قدرت أشارك الشاشة");
-    }
-  };
-}
-
-function stopHostingScreen() {
-  // اقفل اتصالات الضيوف
-  Object.values(hostPeers).forEach(p => {
-    try { p.destroy(); } catch {}
-  });
-  for (const k in hostPeers) delete hostPeers[k];
-
-  // وقف الستريم
-  if (hostStream) {
-    hostStream.getTracks().forEach(t => t.stop());
-    hostStream = null;
-  }
-
-  // فضّي الفيديو
-  if (stageVideo) stageVideo.srcObject = null;
-
-  console.log("🧹 Screen sharing stopped");
-}
-
-socket.on("viewer:joined", ({ viewerId }) => {
-  // لا تسوي شيء إذا ما عندك ستريم شغال
-  if (!hostStream) return;
-
-  // مهم: لا تسوي peer لنفسك
-  if (!viewerId || viewerId === socket.id) return;
-
-  // إذا موجود قبل لا تعيد
-  if (hostPeers[viewerId]) return;
-
-  const peer = new SimplePeer({
-    initiator: true,
-    trickle: false,
-    stream: hostStream,
-  });
-
-  hostPeers[viewerId] = peer;
-
-  peer.on("signal", (signal) => {
-    socket.emit("webrtc:signal", { to: viewerId, signal });
-  });
-
-  peer.on("close", () => {
-    delete hostPeers[viewerId];
-  });
-
-  peer.on("error", (err) => {
-    console.log("peer error", err);
-    delete hostPeers[viewerId];
-  });
-});
-
-// الضيف يقول: أنا مشاهد
-socket.emit("viewer:join");
-
-socket.on("webrtc:signal", async ({ from, signal }) => {
-  // ===== الضيف =====
-  // إذا ما عنده peer، ينشئ واحد (غير initiator)
-  if (!viewerPeer) {
-    viewerPeer = new SimplePeer({
-      initiator: false,
-      trickle: false,
-    });
-
-    viewerPeer.on("signal", (sig) => {
-      socket.emit("webrtc:signal", { to: from, signal: sig });
-    });
-
-    viewerPeer.on("stream", async (stream) => {
-      if (stageVideo) {
-        stageVideo.srcObject = stream;
-        stageVideo.muted = true; // عشان autoplay
-        await stageVideo.play().catch(()=>{});
-      }
-    });
-
-    viewerPeer.on("close", () => {
-      viewerPeer = null;
-    });
-
-    viewerPeer.on("error", (e) => {
-      console.log("viewerPeer error", e);
-      viewerPeer = null;
-    });
-  }
-
-  // استقبل الإشارة
-  try {
-    viewerPeer.signal(signal);
-  } catch (e) {
-    console.log("signal error", e);
-  }
-});
-
-socket.on("webrtc:signal", ({ to, signal }) => {
-  if (!to || !signal) return;
-  io.to(to).emit("webrtc:signal", { from: socket.id, signal });
-});
-
   // ====== زر اللعبة ======
   const buzzBtn = document.getElementById("buzzBtn");
 
@@ -266,61 +131,51 @@ socket.on("webrtc:signal", ({ to, signal }) => {
   });
 
   // =========================
-  // طلبات (مقدم)
+  // طلبات (مقدم) - طريقة مضمونة
   // =========================
-  // =========================
-// طلبات (مقدم) - بطريقة مضمونة
-// =========================
-if (requestsContainer) {
-  // كليك واحد لكل الأزرار (قبول/رفض)
-  requestsContainer.addEventListener("click", (e) => {
-    const btn = e.target.closest("button");
-    if (!btn) return;
+  if (requestsContainer) {
+    requestsContainer.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
 
-    const id = btn.dataset.id;
-    const action = btn.dataset.action;
+      const id = btn.dataset.id;
+      const action = btn.dataset.action;
+      if (!id || !action) return;
 
-    if (!id || !action) return;
+      if (action === "accept") socket.emit("acceptRequest", id);
+      if (action === "reject") socket.emit("rejectRequest", id);
+    });
+  }
 
-    console.log("🟦 host click:", action, id);
+  socket.on("updateRequests", (requests) => {
+    if (!requestsContainer) return;
+    requestsContainer.innerHTML = "";
 
-    if (action === "accept") socket.emit("acceptRequest", id);
-    if (action === "reject") socket.emit("rejectRequest", id);
+    requests.forEach((req) => {
+      const box = document.createElement("div");
+      box.className = "request-card";
+
+      const nm = document.createElement("span");
+      nm.textContent = req.name;
+
+      const accept = document.createElement("button");
+      accept.className = "accept";
+      accept.type = "button";
+      accept.textContent = "✅";
+      accept.dataset.action = "accept";
+      accept.dataset.id = req.id;
+
+      const reject = document.createElement("button");
+      reject.className = "reject";
+      reject.type = "button";
+      reject.textContent = "❌";
+      reject.dataset.action = "reject";
+      reject.dataset.id = req.id;
+
+      box.append(nm, accept, reject);
+      requestsContainer.appendChild(box);
+    });
   });
-}
-
-socket.on("updateRequests", (requests) => {
-  if (!requestsContainer) return;
-
-  console.log("📩 updateRequests:", requests);
-
-  requestsContainer.innerHTML = "";
-
-  requests.forEach((req) => {
-    const box = document.createElement("div");
-    box.className = "request-card";
-
-    const nm = document.createElement("span");
-    nm.textContent = req.name;
-
-    const accept = document.createElement("button");
-    accept.className = "accept";
-    accept.type = "button";
-    accept.textContent = "✅";
-    accept.dataset.action = "accept";
-    accept.dataset.id = req.id;
-
-    const reject = document.createElement("button");
-    reject.className = "reject";
-    reject.type = "button";
-    reject.textContent = "❌";
-    reject.dataset.action = "reject";
-    reject.dataset.id = req.id;
-
-    box.append(nm, accept, reject);
-    requestsContainer.appendChild(box);
-  });
-});
 
   // =========================
   // قفل اختيار الفرق
@@ -397,11 +252,9 @@ socket.on("updateRequests", (requests) => {
   // رسم اللاعبين (ضيف + مقدم)
   // =========================
   socket.on("updatePlayers", (players) => {
-    // عرف فريقي أنا
     if (myId && players[myId]) myTeam = players[myId].team || null;
     else myTeam = null;
 
-    // --- ضيف ---
     if (gLeftPlayers) gLeftPlayers.innerHTML = "";
     if (gRightPlayers) gRightPlayers.innerHTML = "";
 
@@ -428,14 +281,12 @@ socket.on("updateRequests", (requests) => {
           gRightPlayers.appendChild(row);
         }
       }
-        // ✅ بعد ما عرفنا فريقي، حدّث الزر فوراً
-    if (lastBuzzState) setBuzzVisual(lastBuzzState);
     });
 
     if (gLeftCount) gLeftCount.textContent = l;
     if (gRightCount) gRightCount.textContent = r;
 
-    // --- مقدم ---
+    // مقدم
     if (!noTeam || !leftTeam || !rightTeam) return;
 
     if (leftCount) leftCount.textContent = l;
@@ -448,7 +299,6 @@ socket.on("updateRequests", (requests) => {
     Object.entries(players).forEach(([id, p]) => {
       const score = p.correctCount || 0;
 
-      // داخل فريق (مقدم)
       if (p.team === "left" || p.team === "right") {
         const row = document.createElement("div");
         row.className = "player-item host-row";
@@ -481,11 +331,9 @@ socket.on("updateRequests", (requests) => {
 
         if (p.team === "left") leftTeam.appendChild(row);
         else rightTeam.appendChild(row);
-
         return;
       }
 
-      // بدون فريق (مقدم)
       const box = document.createElement("div");
       box.className = "noTeamPlayer";
 
@@ -519,6 +367,8 @@ socket.on("updateRequests", (requests) => {
       box.append(nm, btns);
       noTeam.appendChild(box);
     });
+
+    if (lastBuzzState) setBuzzVisual(lastBuzzState);
   });
 
   // =========================
@@ -529,39 +379,31 @@ socket.on("updateRequests", (requests) => {
 
     buzzBtn.classList.remove("buzz-red", "buzz-green", "buzz-grey");
 
-    // لازم يختار فريق
     if (myTeam !== "left" && myTeam !== "right") {
       buzzBtn.classList.add("buzz-red");
       buzzBtn.disabled = true;
       return;
     }
 
-    // مقفل بسبب ضغط
     if (state.locked) {
-      if (state.lockedBy && state.lockedBy.id === myId) {
-        buzzBtn.classList.add("buzz-green");
-      } else {
-        buzzBtn.classList.add("buzz-grey");
-      }
+      if (state.lockedBy && state.lockedBy.id === myId) buzzBtn.classList.add("buzz-green");
+      else buzzBtn.classList.add("buzz-grey");
       buzzBtn.disabled = true;
       return;
     }
 
-    // فريقي ممنوع
     if (state.disabledTeams && state.disabledTeams[myTeam]) {
       buzzBtn.classList.add("buzz-grey");
       buzzBtn.disabled = true;
       return;
     }
 
-    // السماح لفريق آخر
     if (state.allowedTeam !== "both" && state.allowedTeam !== myTeam) {
       buzzBtn.classList.add("buzz-grey");
       buzzBtn.disabled = true;
       return;
     }
 
-    // مسموح
     buzzBtn.classList.add("buzz-red");
     buzzBtn.disabled = false;
   }
@@ -570,13 +412,8 @@ socket.on("updateRequests", (requests) => {
     lastBuzzState = state;
     setBuzzVisual(state);
 
-    // شارات القفل داخل الكروت
-    if (leftLockBadge) {
-      leftLockBadge.classList.toggle("hidden", !(state.disabledTeams && state.disabledTeams.left));
-    }
-    if (rightLockBadge) {
-      rightLockBadge.classList.toggle("hidden", !(state.disabledTeams && state.disabledTeams.right));
-    }
+    if (leftLockBadge) leftLockBadge.classList.toggle("hidden", !(state.disabledTeams && state.disabledTeams.left));
+    if (rightLockBadge) rightLockBadge.classList.toggle("hidden", !(state.disabledTeams && state.disabledTeams.right));
   });
 
   // ضغط زر الضيف
@@ -605,7 +442,6 @@ socket.on("updateRequests", (requests) => {
       ? (info.teamKey === "left" ? currentTeamSettings.left.color : currentTeamSettings.right.color)
       : "#d8212d";
 
-    // ضيف
     if (buzzOverlay && buzzInfo) {
       buzzInfo.innerHTML = `اللاعب: <b>${info.name}</b><br>الفريق: <b>${info.teamName}</b>`;
       const card = buzzOverlay.querySelector(".buzz-card");
@@ -614,7 +450,6 @@ socket.on("updateRequests", (requests) => {
       buzzOverlay.classList.remove("hidden");
     }
 
-    // مقدم
     if (hostBuzzPanel && hostBuzzInfo) {
       hostBuzzInfo.innerHTML = `اللاعب: <b>${info.name}</b><br>الفريق: <b>${info.teamName}</b>`;
       const card = hostBuzzPanel.querySelector(".buzz-card");
@@ -630,12 +465,7 @@ socket.on("updateRequests", (requests) => {
   if (markCorrectBtn) markCorrectBtn.onclick = () => socket.emit("judgeAnswer", { correct: true });
   if (markWrongBtn) markWrongBtn.onclick = () => socket.emit("judgeAnswer", { correct: false });
 
-  if (resetBtn) {
-    resetBtn.addEventListener("click", () => {
-      console.log("🟥 Host Reset clicked -> resetBuzz");
-      socket.emit("resetBuzz");
-    });
-  }
+  if (resetBtn) resetBtn.addEventListener("click", () => socket.emit("resetBuzz"));
 
   if (leftLockBtn) leftLockBtn.onclick = () => socket.emit("lockTeamBuzz", "left");
   if (leftOpenBtn) leftOpenBtn.onclick = () => socket.emit("openTeamBuzz", "left");
@@ -647,13 +477,11 @@ socket.on("updateRequests", (requests) => {
   if (lockRightBtn) lockRightBtn.onclick = () => socket.emit("lockTeamBuzz", "right");
   if (openRightBtn) openRightBtn.onclick = () => socket.emit("openTeamBuzz", "right");
 
-  // بعد الحكم نخفي لوحات الحكم
   socket.on("judgeResult", () => {
     if (hostBuzzPanel) hostBuzzPanel.classList.add("hidden");
     if (buzzOverlay) buzzOverlay.classList.add("hidden");
   });
 
-  // Timer / TimeUp
   socket.on("timer", (t) => {
     if (timerText) timerText.textContent = "Timer: " + t;
     if (buzzTimer) buzzTimer.textContent = "Timer: " + t;
@@ -671,7 +499,6 @@ socket.on("updateRequests", (requests) => {
     if (statusText) statusText.textContent = "انتهى الوقت";
   });
 
-  // Reset يرجع النصوص ويخفي اللوحات
   socket.on("reset", () => {
     if (statusText) statusText.textContent = "بانتظار الضغط...";
     if (timerText) timerText.textContent = "Timer: 0";
@@ -684,196 +511,206 @@ socket.on("updateRequests", (requests) => {
     if (hostBuzzTimer) hostBuzzTimer.textContent = "Timer: 0";
     if (hostBuzzTimeUp) hostBuzzTimeUp.classList.add("hidden");
   });
-  // ===== MEDIA SCREEN (Host + Guest) =====
-const mediaFrame = document.getElementById("mediaFrame");
-const mediaImg = document.getElementById("mediaImg");
-const mediaVideo = document.getElementById("mediaVideo");
-const mediaPlaceholder = document.getElementById("mediaPlaceholder");
 
-const btnShareScreen = document.getElementById("btnShareScreen");
-const btnAddImage = document.getElementById("btnAddImage");
-const btnAddLink = document.getElementById("btnAddLink");
-const btnRemoveMedia = document.getElementById("btnRemoveMedia");
+  // =====================================================
+  // =============== MEDIA SCREEN (Host + Guest) ==========
+  // =====================================================
+  const mediaFrame = document.getElementById("mediaFrame");
+  const mediaImg = document.getElementById("mediaImg");
+  const mediaVideo = document.getElementById("mediaVideo");
+  const mediaPlaceholder = document.getElementById("mediaPlaceholder");
 
-const isHost = !!document.getElementById("requestsContainer"); // علامة إن الصفحة مقدم
+  const btnShareScreen = document.getElementById("btnShareScreen");
+  const btnAddImage = document.getElementById("btnAddImage");
+  const btnAddLink = document.getElementById("btnAddLink");
+  const btnRemoveMedia = document.getElementById("btnRemoveMedia");
 
-let hostStream = null;
-let pcs = {}; // host: guestId -> RTCPeerConnection
-let guestPc = null;
+  let hostStream = null;
+  let pcs = {}; // host: guestId -> RTCPeerConnection
+  let guestPc = null;
 
-// عرف نفسك كمقدم
-if (isHost) socket.emit("imHost");
-
-function hideAllMedia(){
-  if (mediaFrame) mediaFrame.classList.add("hidden");
-  if (mediaImg) mediaImg.classList.add("hidden");
-  if (mediaVideo) mediaVideo.classList.add("hidden");
-}
-
-function updateRemoveBtn(state){
-  if (!btnRemoveMedia) return;
-  const show = state.type !== "none";
-  btnRemoveMedia.classList.toggle("hidden", !show);
-}
-
-function showPlaceholderForGuest(state){
-  if (!mediaPlaceholder) return;
-  // الضيف فقط: إذا ما فيه شيء، أظهر العبارة
-  if (!isHost && state.type === "none") mediaPlaceholder.classList.remove("hidden");
-  else mediaPlaceholder.classList.add("hidden");
-}
-
-socket.on("mediaState", (state) => {
-  hideAllMedia();
-  updateRemoveBtn(state);
-  showPlaceholderForGuest(state);
-
-  if (!state || state.type === "none") {
-    // وقف مشاركة الشاشة عند المقدم لو كان شغال
-    if (isHost && hostStream) stopShare();
-    return;
+  function hideAllMedia() {
+    if (mediaFrame) mediaFrame.classList.add("hidden");
+    if (mediaImg) mediaImg.classList.add("hidden");
+    if (mediaVideo) mediaVideo.classList.add("hidden");
   }
 
-  if (state.type === "url" && mediaFrame) {
-    mediaFrame.src = state.src;
-    mediaFrame.classList.remove("hidden");
-    return;
+  function updateRemoveBtn(state) {
+    if (!btnRemoveMedia) return;
+    const show = state && state.type && state.type !== "none";
+    btnRemoveMedia.classList.toggle("hidden", !show);
   }
 
-  if (state.type === "image" && mediaImg) {
-    mediaImg.src = state.src;
-    mediaImg.classList.remove("hidden");
-    return;
-  }
-
-  if (state.type === "screen" && mediaVideo) {
-    mediaVideo.classList.remove("hidden");
-    // الضيف يطلب اتصال
-    if (!isHost) socket.emit("screenJoin");
-  }
-});
-
-// ====== HOST buttons ======
-if (isHost && btnAddLink) {
-  btnAddLink.onclick = () => {
-    const u = prompt("حط رابط الموقع:");
-    if (!u) return;
-    socket.emit("setMedia", { type: "url", src: u.trim() });
-  };
-}
-
-if (isHost && btnAddImage) {
-  btnAddImage.onclick = () => {
-    const u = prompt("حط رابط الصورة (ينتهي png/jpg/webp):");
-    if (!u) return;
-    socket.emit("setMedia", { type: "image", src: u.trim() });
-  };
-}
-
-if (isHost && btnRemoveMedia) {
-  btnRemoveMedia.onclick = () => {
-    socket.emit("setMedia", { type: "none", src: "" });
-    socket.emit("resetBuzz"); // إذا تبي ترجع كل شيء طبيعي كمان
-  };
-}
-
-// ====== Screen Share (minimal but كامل) ======
-async function startShare(){
-  hostStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }).catch(()=>null);
-  if (!hostStream) return;
-
-  // عرض للمقدم داخل نفس الفيديو
-  if (mediaVideo) {
-    mediaVideo.srcObject = hostStream;
-    mediaVideo.classList.remove("hidden");
-  }
-
-  socket.emit("setMedia", { type: "screen", src: "" });
-
-  // لو وقف المشاركة من النظام
-  hostStream.getVideoTracks()[0].addEventListener("ended", stopShare);
-}
-
-function stopShare(){
-  Object.values(pcs).forEach(pc => { try{pc.close()}catch(e){} });
-  pcs = {};
-
-  if (hostStream) {
-    hostStream.getTracks().forEach(t=>t.stop());
-    hostStream = null;
-  }
-  if (mediaVideo) mediaVideo.srcObject = null;
-
-  socket.emit("setMedia", { type: "none", src: "" });
-}
-
-if (isHost && btnShareScreen) btnShareScreen.onclick = startShare;
-
-// ====== Host: when guest joins, create offer ======
-socket.on("screenJoin", async ({ guestId }) => {
-  if (!isHost || !hostStream || !guestId) return;
-
-  const pc = new RTCPeerConnection({
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" }
-  ]
-});
-  
-  pcs[guestId] = pc;
-
-  hostStream.getTracks().forEach(track => pc.addTrack(track, hostStream));
-
-  pc.onicecandidate = (e) => {
-    if (e.candidate) socket.emit("webrtcIce", { to: guestId, ice: e.candidate });
-  };
-
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  socket.emit("webrtcOffer", { to: guestId, sdp: pc.localDescription });
-});
-
-socket.on("webrtcAnswer", async ({ from, sdp }) => {
-  if (!isHost || !from || !pcs[from] || !sdp) return;
-  await pcs[from].setRemoteDescription(new RTCSessionDescription(sdp));
-});
-
-socket.on("webrtcIce", async ({ from, ice }) => {
-  if (!from || !ice) return;
-
-  // host side
-  if (isHost && pcs[from]) {
-    try { await pcs[from].addIceCandidate(new RTCIceCandidate(ice)); } catch(e){}
-  }
-
-  // guest side
-  if (!isHost && guestPc) {
-    try { await guestPc.addIceCandidate(new RTCIceCandidate(ice)); } catch(e){}
-  }
-});
-
-// ====== Guest: receive offer, answer ======
-socket.on("webrtcOffer", async ({ from, sdp }) => {
-  if (isHost || !from || !sdp) return;
-
-  if (guestPc) { try{guestPc.close()}catch(e){} }
-  guestPc = new RTCPeerConnection();
-
-  guestPc.ontrack = (e) => {
-    if (mediaVideo) {
-      mediaVideo.srcObject = e.streams[0];
-      mediaVideo.classList.remove("hidden");
+  function showPlaceholderForGuest(state) {
+    if (!mediaPlaceholder) return;
+    if (!isHost && (!state || state.type === "none")) {
+      mediaPlaceholder.classList.remove("hidden");
+    } else {
+      mediaPlaceholder.classList.add("hidden");
     }
-  };
+  }
 
-  guestPc.onicecandidate = (e) => {
-    if (e.candidate) socket.emit("webrtcIce", { to: from, ice: e.candidate });
-  };
+  function stopShareLocalOnly() {
+    // اقفل اتصالات
+    Object.values(pcs).forEach((pc) => {
+      try { pc.close(); } catch (e) {}
+    });
+    pcs = {};
 
-  await guestPc.setRemoteDescription(new RTCSessionDescription(sdp));
-  const ans = await guestPc.createAnswer();
-  await guestPc.setLocalDescription(ans);
+    if (hostStream) {
+      hostStream.getTracks().forEach((t) => t.stop());
+      hostStream = null;
+    }
+    if (mediaVideo) mediaVideo.srcObject = null;
+  }
 
-  socket.emit("webrtcAnswer", { to: from, sdp: guestPc.localDescription });
-});
+  socket.on("mediaState", (state) => {
+    hideAllMedia();
+    updateRemoveBtn(state);
+    showPlaceholderForGuest(state);
+
+    if (!state || state.type === "none") {
+      if (isHost && hostStream) stopShareLocalOnly();
+      return;
+    }
+
+    if (state.type === "url" && mediaFrame) {
+      mediaFrame.src = state.src || "";
+      mediaFrame.classList.remove("hidden");
+      return;
+    }
+
+    if (state.type === "image" && mediaImg) {
+      mediaImg.src = state.src || "";
+      mediaImg.classList.remove("hidden");
+      return;
+    }
+
+    if (state.type === "screen" && mediaVideo) {
+      mediaVideo.classList.remove("hidden");
+      // الضيف يطلب اتصال من المقدم
+      if (!isHost) socket.emit("screenJoin");
+      return;
+    }
+  });
+
+  // ===== HOST buttons (التحكم فقط للمقدم) =====
+  if (isHost && btnAddLink) {
+    btnAddLink.onclick = () => {
+      const u = prompt("حط رابط الموقع:");
+      if (!u) return;
+      socket.emit("setMedia", { type: "url", src: u.trim() });
+    };
+  }
+
+  if (isHost && btnAddImage) {
+    btnAddImage.onclick = () => {
+      const u = prompt("حط رابط الصورة (png/jpg/webp):");
+      if (!u) return;
+      socket.emit("setMedia", { type: "image", src: u.trim() });
+    };
+  }
+
+  if (isHost && btnRemoveMedia) {
+    btnRemoveMedia.onclick = () => {
+      socket.emit("setMedia", { type: "none", src: "" });
+    };
+  }
+
+  // ===== Screen Share (Host) =====
+  async function startShare() {
+    const stream = await navigator.mediaDevices
+      .getDisplayMedia({ video: true, audio: false })
+      .catch(() => null);
+
+    if (!stream) return;
+
+    hostStream = stream;
+
+    if (mediaVideo) {
+      mediaVideo.srcObject = hostStream;
+      mediaVideo.muted = true;
+      mediaVideo.classList.remove("hidden");
+      await mediaVideo.play().catch(() => {});
+    }
+
+    socket.emit("setMedia", { type: "screen", src: "" });
+
+    // إذا المستخدم وقف المشاركة من النظام
+    hostStream.getVideoTracks()[0].addEventListener("ended", () => {
+      socket.emit("setMedia", { type: "none", src: "" });
+      stopShareLocalOnly();
+    });
+  }
+
+  if (isHost && btnShareScreen) btnShareScreen.onclick = startShare;
+
+  // ===== Host: guest asks to join => make offer =====
+  socket.on("screenJoin", async ({ guestId }) => {
+    if (!isHost || !hostStream || !guestId) return;
+    if (guestId === socket.id) return;
+    if (pcs[guestId]) return;
+
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    pcs[guestId] = pc;
+
+    hostStream.getTracks().forEach((track) => pc.addTrack(track, hostStream));
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) socket.emit("webrtcIce", { to: guestId, ice: e.candidate });
+    };
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    socket.emit("webrtcOffer", { to: guestId, sdp: pc.localDescription });
+  });
+
+  socket.on("webrtcAnswer", async ({ from, sdp }) => {
+    if (!isHost || !from || !pcs[from] || !sdp) return;
+    await pcs[from].setRemoteDescription(new RTCSessionDescription(sdp));
+  });
+
+  socket.on("webrtcIce", async ({ from, ice }) => {
+    if (!from || !ice) return;
+
+    if (isHost && pcs[from]) {
+      try { await pcs[from].addIceCandidate(new RTCIceCandidate(ice)); } catch (e) {}
+    }
+
+    if (!isHost && guestPc) {
+      try { await guestPc.addIceCandidate(new RTCIceCandidate(ice)); } catch (e) {}
+    }
+  });
+
+  // ===== Guest: receive offer => answer =====
+  socket.on("webrtcOffer", async ({ from, sdp }) => {
+    if (isHost || !from || !sdp) return;
+
+    if (guestPc) {
+      try { guestPc.close(); } catch (e) {}
+      guestPc = null;
+    }
+
+    guestPc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+
+    guestPc.ontrack = (e) => {
+      if (mediaVideo) {
+        mediaVideo.srcObject = e.streams[0];
+        mediaVideo.muted = true; // يساعد autoplay
+        mediaVideo.classList.remove("hidden");
+        mediaVideo.play().catch(() => {});
+      }
+    };
+
+    guestPc.onicecandidate = (e) => {
+      if (e.candidate) socket.emit("webrtcIce", { to: from, ice: e.candidate });
+    };
+
+    await guestPc.setRemoteDescription(new RTCSessionDescription(sdp));
+    const ans = await guestPc.createAnswer();
+    await guestPc.setLocalDescription(ans);
+
+    socket.emit("webrtcAnswer", { to: from, sdp: guestPc.localDescription });
+  });
 });
