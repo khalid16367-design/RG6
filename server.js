@@ -3,6 +3,8 @@ const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
 
+
+
 app.use(express.static("public"));
 
 // ===== الطلبات =====
@@ -27,14 +29,11 @@ let buzzState = {
 
 let buzzerTimer = null;
 
-// ===== Host (المقدم) =====
 let hostSocketId = null;
+
 function isHost(socket) {
   return socket.id === hostSocketId;
 }
-
-// ===== MEDIA (صورة/رابط/مشاركة شاشة) =====
-let mediaState = { type: "none", src: "" }; // none | image | url | screen
 
 // أرسل الحالة للجميع
 function emitBuzzState() {
@@ -61,69 +60,130 @@ function resetBuzz(full = false) {
   emitBuzzState();
 }
 
-io.on("connection", (socket) => {
-  console.log("🟢 connected:", socket.id);
+let hostId = null;
 
-  // ====== ارسال الحالة عند الدخول ======
+let mediaState = { type: "none", src: "" }; // none | image | url | screen
+
+io.on("connection", (socket) => {
+  // ===== Host auth + ICE servers =====
+let hostId = null;
+
+socket.on("registerHost", () => {
+  hostId = socket.id;
+});
+
+socket.emit("iceServers", [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+
+  ...(process.env.TURN_URL && process.env.TURN_USER && process.env.TURN_PASS
+    ? [{
+        urls: process.env.TURN_URL,
+        username: process.env.TURN_USER,
+        credential: process.env.TURN_PASS
+      }]
+    : [])
+]);
+// ===== media control: host only =====
+let mediaState = { type: "none", src: "" };
+socket.emit("mediaState", mediaState);
+
+socket.on("setMedia", (state) => {
+  if (socket.id !== hostId) return; // ✅ فقط المقدم
+  if (!state || !state.type) return;
+  mediaState = { type: state.type, src: String(state.src || "") };
+  io.emit("mediaState", mediaState);
+});
+
+// ===== WebRTC relay =====
+socket.on("screenJoin", () => {
+  if (!hostId) return;
+  io.to(hostId).emit("screenJoin", { guestId: socket.id });
+});
+
+socket.on("webrtcOffer", ({ to, sdp }) => {
+  if (socket.id !== hostId) return; // offer من المقدم فقط
+  io.to(to).emit("webrtcOffer", { from: socket.id, sdp });
+});
+
+socket.on("webrtcAnswer", ({ to, sdp }) => {
+  io.to(to).emit("webrtcAnswer", { from: socket.id, sdp });
+});
+
+socket.on("webrtcIce", ({ to, ice }) => {
+  io.to(to).emit("webrtcIce", { from: socket.id, ice });
+});
+  // ===== WebRTC signaling relay (مهم للتواصل بين الأجهزة) =====
+socket.on("webrtcOffer", ({ to, sdp }) => {
+  if (!to || !sdp) return;
+  io.to(to).emit("webrtcOffer", { from: socket.id, sdp });
+});
+
+socket.on("webrtcAnswer", ({ to, sdp }) => {
+  if (!to || !sdp) return;
+  io.to(to).emit("webrtcAnswer", { from: socket.id, sdp });
+});
+
+socket.on("webrtcIce", ({ to, ice }) => {
+  if (!to || !ice) return;
+  io.to(to).emit("webrtcIce", { from: socket.id, ice });
+});
+
+  socket.on("registerHost", () => {
+  hostSocketId = socket.id;
+  console.log("👑 Host registered:", hostSocketId);
+});
+console.log("🟢 connected:", socket.id);
+
+
+// ===== WebRTC signaling للشاشة =====
+socket.on("viewer:join", () => {
+  // نبلغ كل المقدمين/الكل أن فيه مشاهد جديد (بنستعمله عند المقدم فقط)
+  io.emit("viewer:joined", { viewerId: socket.id });
+});
+
+socket.on("webrtc:signal", ({ to, signal }) => {
+  if (!to || !signal) return;
+  io.to(to).emit("webrtc:signal", { from: socket.id, signal });
+});
+
+  
+  // من هو المقدم؟
+socket.on("imHost", () => {
+  hostId = socket.id;
+  socket.emit("mediaState", mediaState);
+});
+
+// إرسال الحالة أول ما يدخل أي أحد
+socket.emit("mediaState", mediaState);
+
+// المقدم يغير الحالة (صورة/رابط/ازالة/بدء مشاركة)
+socket.on("setMedia", (state) => {
+  if (!state || !state.type) return;
+  mediaState = { type: state.type, src: state.src || "" };
+  io.emit("mediaState", mediaState);
+});
+
+// الضيف يطلب اتصال مشاركة الشاشة
+socket.on("screenJoin", () => {
+  if (hostId) io.to(hostId).emit("screenJoin", { guestId: socket.id });
+});
+
+// WebRTC إشارات
+socket.on("webrtcOffer", ({ to, sdp }) => { if (to) io.to(to).emit("webrtcOffer", { from: socket.id, sdp }); });
+socket.on("webrtcAnswer", ({ to, sdp }) => { if (to) io.to(to).emit("webrtcAnswer", { from: socket.id, sdp }); });
+socket.on("webrtcIce", ({ to, ice }) => { if (to) io.to(to).emit("webrtcIce", { from: socket.id, ice }); });
+
+socket.on("disconnect", () => {
+  if (socket.id === hostId) hostId = null;
+});
+  
+  // إرسال الحالة عند الدخول
   socket.emit("teamLockStatus", teamChoiceLocked);
   socket.emit("teamSettings", teamSettings);
   socket.emit("updateRequests", joinRequests);
   socket.emit("updatePlayers", players);
   socket.emit("buzzState", buzzState);
-
-  // ====== ICE servers للـ WebRTC ======
-  socket.emit("iceServers", [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    // لو بتضيف TURN من Render ENV بعدين:
-    // { urls: process.env.TURN_URL, username: process.env.TURN_USER, credential: process.env.TURN_PASS }
-  ].filter(Boolean));
-
-  // ====== MEDIA state عند الدخول ======
-  socket.emit("mediaState", mediaState);
-
-  // ====== تسجيل المقدم ======
-  socket.on("registerHost", () => {
-    hostSocketId = socket.id;
-    console.log("👑 Host registered:", hostSocketId);
-
-    // أرسل للمقدم الحالة الحالية
-    socket.emit("mediaState", mediaState);
-  });
-
-  // ====== التحكم بالميديا (المقدم فقط) ======
-  socket.on("setMedia", (state) => {
-    if (!isHost(socket)) return; // ✅ فقط المقدم
-    if (!state || !state.type) return;
-
-    mediaState = { type: state.type, src: String(state.src || "") };
-    io.emit("mediaState", mediaState);
-  });
-
-  // ====== الضيف يطلب اتصال مشاركة الشاشة ======
-  socket.on("screenJoin", () => {
-    if (!hostSocketId) return;
-    io.to(hostSocketId).emit("screenJoin", { guestId: socket.id });
-  });
-
-  // ====== WebRTC relay (Offer/Answer/ICE) ======
-  socket.on("webrtcOffer", ({ to, sdp }) => {
-    // offer لازم يطلع من المقدم فقط
-    if (!isHost(socket)) return;
-    if (!to || !sdp) return;
-    io.to(to).emit("webrtcOffer", { from: socket.id, sdp });
-  });
-
-  socket.on("webrtcAnswer", ({ to, sdp }) => {
-    // answer من الضيف للمقدم
-    if (!to || !sdp) return;
-    io.to(to).emit("webrtcAnswer", { from: socket.id, sdp });
-  });
-
-  socket.on("webrtcIce", ({ to, ice }) => {
-    if (!to || !ice) return;
-    io.to(to).emit("webrtcIce", { from: socket.id, ice });
-  });
 
   /* ======================
      تحديث اسم/لون الفرق من المقدم
@@ -170,15 +230,16 @@ io.on("connection", (socket) => {
   });
 
   /* ======================
-     ✅ قبول/رفض الطلبات
+     ✅ قبول/رفض الطلبات (لازم يكون هنا - مو داخل joinRequest)
   ====================== */
   socket.on("acceptRequest", (id) => {
     console.log("✅ acceptRequest from", socket.id, "target", id);
 
     io.to(id).emit("requestAccepted");
-    joinRequests = joinRequests.filter((r) => r.id !== id);
 
+    joinRequests = joinRequests.filter((r) => r.id !== id);
     io.emit("updateRequests", joinRequests);
+
     io.emit("updatePlayers", players);
   });
 
@@ -186,6 +247,7 @@ io.on("connection", (socket) => {
     console.log("❌ rejectRequest from", socket.id, "target", id);
 
     io.to(id).emit("requestRejected");
+
     joinRequests = joinRequests.filter((r) => r.id !== id);
     delete players[id];
 
@@ -257,13 +319,16 @@ io.on("connection", (socket) => {
   /* ======================
      زر اللعبة (Buzz)
   ====================== */
-  socket.on("buzz", () => {
+  socket.on("buzz", ({ name }) => {
     const p = players[socket.id];
     if (!p) return;
 
     if (p.team !== "left" && p.team !== "right") return;
+
     if (buzzState.disabledTeams[p.team]) return;
+
     if (buzzState.allowedTeam !== "both" && buzzState.allowedTeam !== p.team) return;
+
     if (buzzState.locked) return;
 
     buzzState.locked = true;
@@ -272,7 +337,11 @@ io.on("connection", (socket) => {
     emitBuzzState();
 
     const teamName = teamSettings[p.team].name;
-    io.emit("buzzedInfo", { name: p.name, teamKey: p.team, teamName });
+    io.emit("buzzedInfo", {
+      name: p.name,
+      teamKey: p.team,
+      teamName,
+    });
 
     let timeLeft = 5;
     io.emit("timer", timeLeft);
@@ -381,14 +450,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    // لو المقدم طلع
-    if (socket.id === hostSocketId) {
-      hostSocketId = null;
-      mediaState = { type: "none", src: "" };
-      io.emit("mediaState", mediaState);
-      console.log("👑 Host disconnected, media cleared");
-    }
-
     joinRequests = joinRequests.filter((r) => r.id !== socket.id);
     delete players[socket.id];
 
