@@ -517,14 +517,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // =====================================================
   const mediaFrame = document.getElementById("mediaFrame");
   const mediaImg = document.getElementById("mediaImg");
-  const mediaVideo = document.getElementById("mediaVideo");
-  const mediaPlaceholder = document.getElementById("mediaPlaceholder");
+  const mediaVideo = document.getElementById("mediaVideo") || document.getElementById("stageVideo");
 
-  const btnShareScreen = document.getElementById("btnShareScreen");
-  const btnAddImage = document.getElementById("btnAddImage");
-  const btnAddLink = document.getElementById("btnAddLink");
-  const btnRemoveMedia = document.getElementById("btnRemoveMedia");
-
+const btnShareScreen = document.getElementById("btnShareScreen") || document.getElementById("shareScreenBtn");
+const btnAddImage    = document.getElementById("btnAddImage")    || document.getElementById("addImageBtn");
+const btnAddLink     = document.getElementById("btnAddLink")     || document.getElementById("addLinkBtn");
+const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.getElementById("removeMediaBtn");
   let hostStream = null;
   let pcs = {}; // host: guestId -> RTCPeerConnection
   let guestPc = null;
