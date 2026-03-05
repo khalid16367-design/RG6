@@ -3,16 +3,7 @@ const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
 
-// ===== WebRTC signaling للشاشة =====
-socket.on("viewer:join", () => {
-  // نبلغ كل المقدمين/الكل أن فيه مشاهد جديد (بنستعمله عند المقدم فقط)
-  io.emit("viewer:joined", { viewerId: socket.id });
-});
 
-socket.on("webrtc:signal", ({ to, signal }) => {
-  if (!to || !signal) return;
-  io.to(to).emit("webrtc:signal", { from: socket.id, signal });
-});
 
 app.use(express.static("public"));
 
@@ -68,6 +59,20 @@ let hostId = null;
 let mediaState = { type: "none", src: "" }; // none | image | url | screen
 
 io.on("connection", (socket) => {
+console.log("🟢 connected:", socket.id);
+
+// ===== WebRTC signaling للشاشة =====
+socket.on("viewer:join", () => {
+  // نبلغ كل المقدمين/الكل أن فيه مشاهد جديد (بنستعمله عند المقدم فقط)
+  io.emit("viewer:joined", { viewerId: socket.id });
+});
+
+socket.on("webrtc:signal", ({ to, signal }) => {
+  if (!to || !signal) return;
+  io.to(to).emit("webrtc:signal", { from: socket.id, signal });
+});
+
+  
   // من هو المقدم؟
 socket.on("imHost", () => {
   hostId = socket.id;
@@ -97,8 +102,7 @@ socket.on("webrtcIce", ({ to, ice }) => { if (to) io.to(to).emit("webrtcIce", { 
 socket.on("disconnect", () => {
   if (socket.id === hostId) hostId = null;
 });
-  console.log("🟢 connected:", socket.id);
-
+  
   // إرسال الحالة عند الدخول
   socket.emit("teamLockStatus", teamChoiceLocked);
   socket.emit("teamSettings", teamSettings);
