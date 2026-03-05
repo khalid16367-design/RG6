@@ -567,6 +567,8 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
     updateRemoveBtn(state);
     showPlaceholderForGuest(state);
 
+    const mediaPlaceholder = document.getElementById("mediaPlaceholder");
+
     if (!state || state.type === "none") {
       if (isHost && hostStream) stopShareLocalOnly();
       return;
