@@ -65,6 +65,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const noTeam = document.getElementById("noTeam");
   const leftCount = document.getElementById("leftCount");
   const rightCount = document.getElementById("rightCount");
+    // ====== Team Widgets (Timer / Point) ======
+  const leftWidgetBox = document.getElementById("leftWidgetBox");
+  const rightWidgetBox = document.getElementById("rightWidgetBox");
+  const leftWidgetView = document.getElementById("leftWidgetView");
+  const rightWidgetView = document.getElementById("rightWidgetView");
+
+  const gLeftWidgetBox = document.getElementById("gLeftWidgetBox");
+  const gRightWidgetBox = document.getElementById("gRightWidgetBox");
+  const gLeftWidgetView = document.getElementById("gLeftWidgetView");
+  const gRightWidgetView = document.getElementById("gRightWidgetView");
+
+  const leftWidgetToggleMode = document.getElementById("leftWidgetToggleMode");
+  const rightWidgetToggleMode = document.getElementById("rightWidgetToggleMode");
+  const leftWidgetToggleVisible = document.getElementById("leftWidgetToggleVisible");
+  const rightWidgetToggleVisible = document.getElementById("rightWidgetToggleVisible");
+
+  let latestTeamWidgets = null;
 
   // ====== لوحة تم ضغط الزر (ضيف) ======
   const buzzOverlay = document.getElementById("buzzOverlay");
@@ -102,6 +119,82 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentTeamSettings = null;
   let lastBuzzState = null;
   let myTeam = null;
+    function formatWidgetTime(sec) {
+    return String(sec).padStart(2, "0");
+  }
+
+  function bindTeamWidgetHostControls(team, state) {
+    const startBtn = document.getElementById(`${team}WidgetStartBtn`);
+    const resetBtn = document.getElementById(`${team}WidgetResetBtn`);
+    const pointInput = document.getElementById(`${team}WidgetPointInput`);
+
+    if (startBtn) {
+      startBtn.onclick = () => {
+        if (state.running) socket.emit("stopTeamWidgetTimer", team);
+        else socket.emit("startTeamWidgetTimer", team);
+      };
+    }
+
+    if (resetBtn) {
+      resetBtn.onclick = () => socket.emit("resetTeamWidgetTimer", team);
+    }
+
+    if (pointInput) {
+      pointInput.onchange = () => {
+        socket.emit("setTeamWidgetPoints", {
+          team,
+          value: pointInput.value
+        });
+      };
+    }
+  }
+
+  function renderOneTeamWidget(team, state, hostBox, hostView, guestBox, guestView) {
+    if (!state) return;
+
+    // إظهار / إخفاء
+    if (hostBox) hostBox.classList.toggle("hidden", !state.visible);
+    if (guestBox) guestBox.classList.toggle("hidden", !state.visible);
+
+    let hostHtml = "";
+    let guestHtml = "";
+
+    if (state.mode === "timer") {
+      hostHtml = `
+        <div class="team-widget-main">
+          <span class="team-widget-label">Timer : ${formatWidgetTime(state.seconds)}</span>
+          <button class="team-widget-btn" id="${team}WidgetStartBtn">${state.running ? "إيقاف" : "تشغيل"}</button>
+          <button class="team-widget-btn" id="${team}WidgetResetBtn">Reset</button>
+        </div>
+      `;
+
+      guestHtml = `
+        <div class="team-widget-main">
+          <span class="team-widget-label">Timer : ${formatWidgetTime(state.seconds)}</span>
+        </div>
+      `;
+    } else {
+      hostHtml = `
+        <div class="team-widget-main">
+          <span class="team-widget-label">Point :</span>
+          <input id="${team}WidgetPointInput" class="team-widget-input" type="number" value="${state.points}">
+        </div>
+      `;
+
+      guestHtml = `
+        <div class="team-widget-main">
+          <span class="team-widget-label">Point : ${state.points}</span>
+        </div>
+      `;
+    }
+
+    if (hostView) hostView.innerHTML = hostHtml;
+    if (guestView) guestView.innerHTML = guestHtml;
+
+    if (isHost) {
+      bindTeamWidgetHostControls(team, state);
+    }
+  }
 
   // =========================
   // طلب دخول (ضيف)
@@ -476,6 +569,42 @@ document.addEventListener("DOMContentLoaded", () => {
   if (openLeftBtn) openLeftBtn.onclick = () => socket.emit("openTeamBuzz", "left");
   if (lockRightBtn) lockRightBtn.onclick = () => socket.emit("lockTeamBuzz", "right");
   if (openRightBtn) openRightBtn.onclick = () => socket.emit("openTeamBuzz", "right");
+  if (leftWidgetToggleMode) {
+    leftWidgetToggleMode.onclick = () => socket.emit("toggleTeamWidgetMode", "left");
+  }
+  if (rightWidgetToggleMode) {
+    rightWidgetToggleMode.onclick = () => socket.emit("toggleTeamWidgetMode", "right");
+  }
+
+  if (leftWidgetToggleVisible) {
+    leftWidgetToggleVisible.onclick = () => socket.emit("toggleTeamWidgetVisible", "left");
+  }
+  if (rightWidgetToggleVisible) {
+    rightWidgetToggleVisible.onclick = () => socket.emit("toggleTeamWidgetVisible", "right");
+  }
+
+  socket.on("teamWidgets", (widgets) => {
+    latestTeamWidgets = widgets;
+    if (!widgets) return;
+
+    renderOneTeamWidget(
+      "left",
+      widgets.left,
+      leftWidgetBox,
+      leftWidgetView,
+      gLeftWidgetBox,
+      gLeftWidgetView
+    );
+
+    renderOneTeamWidget(
+      "right",
+      widgets.right,
+      rightWidgetBox,
+      rightWidgetView,
+      gRightWidgetBox,
+      gRightWidgetView
+    );
+  });
 
   socket.on("judgeResult", () => {
     if (hostBuzzPanel) hostBuzzPanel.classList.add("hidden");
@@ -539,8 +668,10 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
     btnRemoveMedia.classList.toggle("hidden", !show);
   }
 
-  function showPlaceholderForGuest(state) {
+    function showPlaceholderForGuest(state) {
+    const mediaPlaceholder = document.getElementById("mediaPlaceholder");
     if (!mediaPlaceholder) return;
+
     if (!isHost && (!state || state.type === "none")) {
       mediaPlaceholder.classList.remove("hidden");
     } else {
