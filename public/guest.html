@@ -4,17 +4,17 @@
   <link rel="icon" type="image/png" href="/images/logo.ico">
   <meta charset="UTF-8">
   <title>RG6 Button</title>
-
-  <div class="logo-box">
-  <img src="images/logo.png" class="site-logo">
-
-  <div class="logo-title">
-    RG6 Button | زر تركي
-  </div>
-</div>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="beige">
+
+  <div class="logo-box">
+    <img src="images/logo.png" class="site-logo">
+
+    <div class="logo-title">
+      RG6 Button | زر تركي
+    </div>
+  </div>
 
   <!-- شاشة الطلب -->
   <div id="requestScreen" class="overlay">
@@ -34,28 +34,28 @@
 
   <!-- شاشة اللعبة -->
   <div id="gameScreen" class="hidden">
-<hr>
-<!-- ✅ شاشة العرض الكبيرة -->
-<div class="media-screen" id="mediaScreen">
+    <hr>
 
-  <!-- للروابط -->
-  <iframe id="mediaFrame" class="hidden"></iframe>
+    <!-- ✅ شاشة العرض الكبيرة -->
+    <div class="media-screen" id="mediaScreen">
 
-  <!-- للصور -->
-  <img id="mediaImg" class="hidden" alt="media" />
+      <!-- للروابط -->
+      <iframe id="mediaFrame" class="hidden"></iframe>
 
-  <!-- لمشاركة الشاشة -->
-  <video id="mediaVideo" class="hidden" autoplay playsinline></video>
-  <video id="stageVideo" autoplay playsinline muted></video>
+      <!-- للصور -->
+      <img id="mediaImg" class="hidden" alt="media" />
 
-  <!-- رسالة افتراضية (تظهر للضيف فقط لما ما فيه شيء) -->
-  <div id="mediaPlaceholder" class="media-placeholder hidden">
-    اشغل وقتك بالاستغفار و التسبيح و ذكر الله
-  </div>
+      <!-- لمشاركة الشاشة -->
+      <video id="mediaVideo" class="hidden" autoplay playsinline></video>
+      <video id="stageVideo" autoplay playsinline muted></video>
 
-</div>
+      <!-- رسالة افتراضية (تظهر للضيف فقط لما ما فيه شيء) -->
+      <div id="mediaPlaceholder" class="media-placeholder hidden">
+        اشغل وقتك بالاستغفار و التسبيح و ذكر الله
+      </div>
+    </div>
 
-<!-- ✅ شاشة تم ضغط الزر (داخل الصفحة + بالنص) -->
+    <!-- ✅ شاشة تم ضغط الزر (داخل الصفحة + بالنص) -->
     <div id="buzzOverlay" class="buzz-panel hidden">
       <div class="buzz-card">
         <div class="buzz-title">تم ضغط الزر من قبل:</div>
@@ -71,18 +71,17 @@
     </div>
 
     <div class="guest-no-team-wrap">
-  <div class="guest-no-team-title">لاعبين بدون فريق</div>
-  <div id="gNoTeamPlayers" class="guest-no-team-box"></div>
-</div>
-  </div>
-  
+      <div class="guest-no-team-title">لاعبين بدون فريق</div>
+      <div id="gNoTeamPlayers" class="guest-no-team-box"></div>
+    </div>
+
     <!-- لوحة الفرق للضيف -->
     <div class="teams-wrapper guest-teams">
       <div class="team-card" id="gLeftCard">
         <div class="team-title guest-title" id="gLeftName">الفريق الأيسر</div>
         <div class="team-widget-box guest-widget-box" id="gLeftWidgetBox">
-  <div id="gLeftWidgetView"></div>
-</div>
+          <div id="gLeftWidgetView"></div>
+        </div>
         <div class="players-box" id="gLeftPlayers"></div>
         <div class="team-footer">
           عدد اللاعبين: <span id="gLeftCount">0</span>
@@ -93,8 +92,8 @@
       <div class="team-card" id="gRightCard">
         <div class="team-title guest-title" id="gRightName">الفريق الأيمن</div>
         <div class="team-widget-box guest-widget-box" id="gRightWidgetBox">
-  <div id="gRightWidgetView"></div>
-</div>
+          <div id="gRightWidgetView"></div>
+        </div>
         <div class="players-box" id="gRightPlayers"></div>
         <div class="team-footer">
           عدد اللاعبين: <span id="gRightCount">0</span>
@@ -102,8 +101,7 @@
         <button class="joinBtn" id="gJoinRight">انضم هنا</button>
       </div>
     </div>
-
-    
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
