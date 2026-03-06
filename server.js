@@ -358,18 +358,20 @@ io.on("connection", (socket) => {
   });
 
   socket.on("openTeamBuzz", (team) => {
-    if (team !== "left" && team !== "right") return;
+  if (team !== "left" && team !== "right") return;
 
-    buzzState.disabledTeams.left = false;
-    buzzState.disabledTeams.right = false;
-    buzzState.allowedTeam = team;
-    buzzState.locked = false;
-    buzzState.lockedBy = null;
+  // افتح اللعب لفريق واحد فقط
+  // بدون ما نغيّر قفل الفريق الثاني
+  buzzState.allowedTeam = team;
+  buzzState.disabledTeams[team] = false;
 
-    io.emit("timer", 0);
-    io.emit("reset");
-    emitBuzzState();
-  });
+  buzzState.locked = false;
+  buzzState.lockedBy = null;
+
+  io.emit("timer", 0);
+  io.emit("reset");
+  emitBuzzState();
+});
 
   socket.on("reset", () => {
     buzzState.locked = false;
@@ -413,3 +415,4 @@ io.on("connection", (socket) => {
 http.listen(3000, () => {
   console.log("🚀 Server running on http://localhost:3000");
 });
+
