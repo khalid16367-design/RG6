@@ -647,6 +647,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const mediaFrame = document.getElementById("mediaFrame");
   const mediaImg = document.getElementById("mediaImg");
   const mediaVideo = document.getElementById("mediaVideo") || document.getElementById("stageVideo");
+  const mediaPlaceholder = document.getElementById("mediaPlaceholder");
 
 const btnShareScreen = document.getElementById("btnShareScreen") || document.getElementById("shareScreenBtn");
 const btnAddImage    = document.getElementById("btnAddImage")    || document.getElementById("addImageBtn");
@@ -657,9 +658,10 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
   let guestPc = null;
 
   function hideAllMedia() {
-    if (mediaFrame) mediaFrame.classList.add("hidden");
-    if (mediaImg) mediaImg.classList.add("hidden");
-    if (mediaVideo) mediaVideo.classList.add("hidden");
+  if (mediaFrame) mediaFrame.classList.add("hidden");
+  if (mediaImg) mediaImg.classList.add("hidden");
+  if (mediaVideo) mediaVideo.classList.add("hidden");
+  if (mediaPlaceholder) mediaPlaceholder.classList.add("hidden");
   }
 
   function updateRemoveBtn(state) {
@@ -669,13 +671,13 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
   }
 
     function showPlaceholderForGuest(state) {
-    const mediaPlaceholder = document.getElementById("mediaPlaceholder");
-    if (!mediaPlaceholder) return;
+  if (!mediaPlaceholder) return;
 
-    if (!isHost && (!state || state.type === "none")) {
-      mediaPlaceholder.classList.remove("hidden");
-    } else {
-      mediaPlaceholder.classList.add("hidden");
+  if (!isHost && (!state || state.type === "none")) {
+    mediaPlaceholder.textContent = "لا يوجد محتوى حالياً";
+    mediaPlaceholder.classList.remove("hidden");
+  } else {
+    mediaPlaceholder.classList.add("hidden");
     }
   }
 
@@ -698,7 +700,6 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
     updateRemoveBtn(state);
     showPlaceholderForGuest(state);
 
-    const mediaPlaceholder = document.getElementById("mediaPlaceholder");
 
     if (!state || state.type === "none") {
       if (isHost && hostStream) stopShareLocalOnly();
@@ -718,11 +719,26 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
     }
 
     if (state.type === "screen" && mediaVideo) {
-      mediaVideo.classList.remove("hidden");
-      // الضيف يطلب اتصال من المقدم
-      if (!isHost) socket.emit("screenJoin");
+  mediaVideo.classList.remove("hidden");
+
+  const isPlayStation = /PlayStation/i.test(navigator.userAgent);
+  const hasWebRTC = !!window.RTCPeerConnection;
+
+  if (!isHost) {
+    if (isPlayStation || !hasWebRTC) {
+      if (mediaPlaceholder) {
+        mediaPlaceholder.textContent = "مشاركة الشاشة غير مدعومة على هذا المتصفح";
+        mediaPlaceholder.classList.remove("hidden");
+      }
+      mediaVideo.classList.add("hidden");
       return;
     }
+
+    socket.emit("screenJoin");
+  }
+
+  return;
+}
   });
 
   // ===== HOST buttons (التحكم فقط للمقدم) =====
@@ -825,12 +841,13 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
 
     guestPc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-    guestPc.ontrack = (e) => {
-      if (mediaVideo) {
-        mediaVideo.srcObject = e.streams[0];
-        mediaVideo.muted = true; // يساعد autoplay
-        mediaVideo.classList.remove("hidden");
-        mediaVideo.play().catch(() => {});
+   guestPc.ontrack = (e) => {
+  if (mediaVideo) {
+    mediaVideo.srcObject = e.streams[0];
+    mediaVideo.muted = true;
+    mediaVideo.classList.remove("hidden");
+    if (mediaPlaceholder) mediaPlaceholder.classList.add("hidden");
+    mediaVideo.play().catch(() => {});
       }
     };
 
