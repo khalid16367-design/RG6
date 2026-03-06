@@ -346,45 +346,55 @@ document.addEventListener("DOMContentLoaded", () => {
   // رسم اللاعبين (ضيف + مقدم)
   // =========================
   socket.on("updatePlayers", (players) => {
-    if (myId && players[myId]) myTeam = players[myId].team || null;
-    else myTeam = null;
+  if (myId && players[myId]) myTeam = players[myId].team || null;
+  else myTeam = null;
 
-    if (gLeftPlayers) gLeftPlayers.innerHTML = "";
-    if (gRightPlayers) gRightPlayers.innerHTML = "";
-    if (gNoTeamPlayers) gNoTeamPlayers.innerHTML = "";
+  // ===== تحديث الضيف =====
+  if (gLeftPlayers) gLeftPlayers.innerHTML = "";
+  if (gRightPlayers) gRightPlayers.innerHTML = "";
+  if (gNoTeamPlayers) gNoTeamPlayers.innerHTML = "";
 
-    let l = 0, r = 0;
-    Object.values(players).forEach((p) => {
-      const score = p.correctCount || 0;
+  let l = 0, r = 0;
 
-      if (p.team === "left") {
-        l++;
-        if (gLeftPlayers) {
-          const row = document.createElement("div");
-          row.className = "player-item";
-          row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
-          gLeftPlayers.appendChild(row);
-        }
+  Object.values(players).forEach((p) => {
+    const score = p.correctCount || 0;
+
+    if (p.team === "left") {
+      l++;
+      if (gLeftPlayers) {
+        const row = document.createElement("div");
+        row.className = "player-item";
+        row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
+        gLeftPlayers.appendChild(row);
       }
+      return;
+    }
 
-      
-      if (p.team !== "left" && p.team !== "right") {
-        if (gNoTeamPlayers) {
-          const row = document.createElement("div");
-          row.className = "player-item";
-          row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
-          gNoTeamPlayers.appendChild(row);
-
-        }
+    if (p.team === "right") {
+      r++;
+      if (gRightPlayers) {
+        const row = document.createElement("div");
+        row.className = "player-item";
+        row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
+        gRightPlayers.appendChild(row);
       }
-    });
+      return;
+    }
 
-    if (gLeftCount) gLeftCount.textContent = l;
-    if (gRightCount) gRightCount.textContent = r;
+    // بدون فريق - يظهر للضيف إذا عندك الصندوق
+    if (gNoTeamPlayers) {
+      const row = document.createElement("div");
+      row.className = "player-item";
+      row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
+      gNoTeamPlayers.appendChild(row);
+    }
+  });
 
-    // مقدم
-    if (!noTeam || !leftTeam || !rightTeam) return;
+  if (gLeftCount) gLeftCount.textContent = l;
+  if (gRightCount) gRightCount.textContent = r;
 
+  // ===== تحديث المقدم =====
+  if (noTeam && leftTeam && rightTeam) {
     if (leftCount) leftCount.textContent = l;
     if (rightCount) rightCount.textContent = r;
 
@@ -427,6 +437,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (p.team === "left") leftTeam.appendChild(row);
         else rightTeam.appendChild(row);
+
         return;
       }
 
@@ -463,10 +474,10 @@ document.addEventListener("DOMContentLoaded", () => {
       box.append(nm, btns);
       noTeam.appendChild(box);
     });
+  }
 
-    if (lastBuzzState) setBuzzVisual(lastBuzzState);
-  });
-
+  if (lastBuzzState) setBuzzVisual(lastBuzzState);
+});
   // =========================
   // شكل الزر حسب الحالة
   // =========================
