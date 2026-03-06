@@ -7,8 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (isHost) socket.emit("registerHost");
 
   // ===== ICE (STUN/TURN) =====
-  // افتراضي STUN فقط (يشتغل غالبًا داخل نفس الشبكة)
-  // عشان يشتغل خارج نفس الشبكة لازم TURN (بنستلمه من السيرفر عبر iceServers)
   let ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
@@ -66,7 +64,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const noTeam = document.getElementById("noTeam");
   const leftCount = document.getElementById("leftCount");
   const rightCount = document.getElementById("rightCount");
-    // ====== Team Widgets (Timer / Point) ======
+
+  // ====== Team Widgets (Timer / Point) ======
   const leftWidgetBox = document.getElementById("leftWidgetBox");
   const rightWidgetBox = document.getElementById("rightWidgetBox");
   const leftWidgetView = document.getElementById("leftWidgetView");
@@ -120,7 +119,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentTeamSettings = null;
   let lastBuzzState = null;
   let myTeam = null;
-    function formatWidgetTime(sec) {
+
+  function formatWidgetTime(sec) {
     return String(sec).padStart(2, "0");
   }
 
@@ -153,7 +153,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderOneTeamWidget(team, state, hostBox, hostView, guestBox, guestView) {
     if (!state) return;
 
-    // إظهار / إخفاء
     if (hostBox) hostBox.classList.toggle("hidden", !state.visible);
     if (guestBox) guestBox.classList.toggle("hidden", !state.visible);
 
@@ -309,13 +308,11 @@ document.addEventListener("DOMContentLoaded", () => {
   socket.on("teamSettings", (settings) => {
     currentTeamSettings = settings;
 
-    // الضيف
     if (gLeftName) gLeftName.textContent = settings.left.name;
     if (gRightName) gRightName.textContent = settings.right.name;
     if (gLeftCard) gLeftCard.style.background = settings.left.color;
     if (gRightCard) gRightCard.style.background = settings.right.color;
 
-    // المقدم
     if (leftTeamNameInput) leftTeamNameInput.value = settings.left.name;
     if (rightTeamNameInput) rightTeamNameInput.value = settings.right.name;
     if (leftCard) leftCard.style.background = settings.left.color;
@@ -346,75 +343,118 @@ document.addEventListener("DOMContentLoaded", () => {
   // رسم اللاعبين (ضيف + مقدم)
   // =========================
   socket.on("updatePlayers", (players) => {
-  if (myId && players[myId]) myTeam = players[myId].team || null;
-  else myTeam = null;
+    if (myId && players[myId]) myTeam = players[myId].team || null;
+    else myTeam = null;
 
-  // ===== تحديث الضيف =====
-  if (gLeftPlayers) gLeftPlayers.innerHTML = "";
-  if (gRightPlayers) gRightPlayers.innerHTML = "";
-  if (gNoTeamPlayers) gNoTeamPlayers.innerHTML = "";
+    if (gLeftPlayers) gLeftPlayers.innerHTML = "";
+    if (gRightPlayers) gRightPlayers.innerHTML = "";
+    if (gNoTeamPlayers) gNoTeamPlayers.innerHTML = "";
 
-  let l = 0, r = 0;
+    let l = 0, r = 0;
 
-  Object.values(players).forEach((p) => {
-    const score = p.correctCount || 0;
-
-    if (p.team === "left") {
-      l++;
-      if (gLeftPlayers) {
-        const row = document.createElement("div");
-        row.className = "player-item";
-        row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
-        gLeftPlayers.appendChild(row);
-      }
-      return;
-    }
-
-    if (p.team === "right") {
-      r++;
-      if (gRightPlayers) {
-        const row = document.createElement("div");
-        row.className = "player-item";
-        row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
-        gRightPlayers.appendChild(row);
-      }
-      return;
-    }
-
-    // بدون فريق - يظهر للضيف إذا عندك الصندوق
-    if (gNoTeamPlayers) {
-      const row = document.createElement("div");
-      row.className = "player-item";
-      row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
-      gNoTeamPlayers.appendChild(row);
-    }
-  });
-
-  if (gLeftCount) gLeftCount.textContent = l;
-  if (gRightCount) gRightCount.textContent = r;
-
-  // ===== تحديث المقدم =====
-  if (noTeam && leftTeam && rightTeam) {
-    if (leftCount) leftCount.textContent = l;
-    if (rightCount) rightCount.textContent = r;
-
-    noTeam.innerHTML = "";
-    leftTeam.innerHTML = "";
-    rightTeam.innerHTML = "";
-
-    Object.entries(players).forEach(([id, p]) => {
+    Object.values(players).forEach((p) => {
       const score = p.correctCount || 0;
 
-      if (p.team === "left" || p.team === "right") {
+      if (p.team === "left") {
+        l++;
+        if (gLeftPlayers) {
+          const row = document.createElement("div");
+          row.className = "player-item";
+          row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
+          gLeftPlayers.appendChild(row);
+        }
+        return;
+      }
+
+      if (p.team === "right") {
+        r++;
+        if (gRightPlayers) {
+          const row = document.createElement("div");
+          row.className = "player-item";
+          row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
+          gRightPlayers.appendChild(row);
+        }
+        return;
+      }
+
+      if (gNoTeamPlayers) {
         const row = document.createElement("div");
-        row.className = "player-item host-row";
+        row.className = "player-item";
+        row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
+        gNoTeamPlayers.appendChild(row);
+      }
+    });
 
-        const info = document.createElement("span");
-        info.className = "pinfo";
-        info.textContent = `${p.name} | ✅${score}`;
+    if (gLeftCount) gLeftCount.textContent = l;
+    if (gRightCount) gRightCount.textContent = r;
 
-        const controls = document.createElement("div");
-        controls.className = "pcontrols";
+    if (noTeam && leftTeam && rightTeam) {
+      if (leftCount) leftCount.textContent = l;
+      if (rightCount) rightCount.textContent = r;
+
+      noTeam.innerHTML = "";
+      leftTeam.innerHTML = "";
+      rightTeam.innerHTML = "";
+
+      Object.entries(players).forEach(([id, p]) => {
+        const score = p.correctCount || 0;
+
+        if (p.team === "left" || p.team === "right") {
+          const row = document.createElement("div");
+          row.className = "player-item host-row";
+
+          const info = document.createElement("span");
+          info.className = "pinfo";
+          info.textContent = `${p.name} | ✅${score}`;
+
+          const controls = document.createElement("div");
+          controls.className = "pcontrols";
+
+          const minus = document.createElement("button");
+          minus.textContent = "➖";
+          minus.onclick = () => socket.emit("adjustScore", { id, delta: -1 });
+
+          const plus = document.createElement("button");
+          plus.textContent = "➕";
+          plus.onclick = () => socket.emit("adjustScore", { id, delta: 1 });
+
+          const removeBtn = document.createElement("button");
+          removeBtn.textContent = "❌";
+          removeBtn.onclick = () => socket.emit("excludePlayer", id);
+
+          const swapBtn = document.createElement("button");
+          swapBtn.textContent = "🔀";
+          swapBtn.onclick = () => socket.emit("swapTeam", id);
+
+          controls.append(minus, plus, removeBtn, swapBtn);
+          row.append(info, controls);
+
+          if (p.team === "left") leftTeam.appendChild(row);
+          else rightTeam.appendChild(row);
+
+          return;
+        }
+
+        const box = document.createElement("div");
+        box.className = "noTeamPlayer";
+
+        const nm = document.createElement("span");
+        nm.textContent = `${p.name} | ✅${score}`;
+
+        const btns = document.createElement("div");
+        btns.className = "noTeamBtns";
+
+        const leftBtn = document.createElement("button");
+        leftBtn.textContent = "➡️";
+        leftBtn.onclick = () => socket.emit("setTeam", { id, team: "left" });
+
+        const rightBtn = document.createElement("button");
+        rightBtn.textContent = "⬅️";
+        rightBtn.onclick = () => socket.emit("setTeam", { id, team: "right" });
+
+        const kickBtn = document.createElement("button");
+        kickBtn.textContent = "⚠️";
+        kickBtn.onclick = () => socket.emit("kickPlayer", id);
 
         const minus = document.createElement("button");
         minus.textContent = "➖";
@@ -424,60 +464,15 @@ document.addEventListener("DOMContentLoaded", () => {
         plus.textContent = "➕";
         plus.onclick = () => socket.emit("adjustScore", { id, delta: 1 });
 
-        const removeBtn = document.createElement("button");
-        removeBtn.textContent = "❌";
-        removeBtn.onclick = () => socket.emit("excludePlayer", id);
+        btns.append(leftBtn, rightBtn, kickBtn, minus, plus);
+        box.append(nm, btns);
+        noTeam.appendChild(box);
+      });
+    }
 
-        const swapBtn = document.createElement("button");
-        swapBtn.textContent = "🔀";
-        swapBtn.onclick = () => socket.emit("swapTeam", id);
+    if (lastBuzzState) setBuzzVisual(lastBuzzState);
+  });
 
-        controls.append(minus, plus, removeBtn, swapBtn);
-        row.append(info, controls);
-
-        if (p.team === "left") leftTeam.appendChild(row);
-        else rightTeam.appendChild(row);
-
-        return;
-      }
-
-      const box = document.createElement("div");
-      box.className = "noTeamPlayer";
-
-      const nm = document.createElement("span");
-      nm.textContent = `${p.name} | ✅${score}`;
-
-      const btns = document.createElement("div");
-      btns.className = "noTeamBtns";
-
-      const leftBtn = document.createElement("button");
-      leftBtn.textContent = "➡️";
-      leftBtn.onclick = () => socket.emit("setTeam", { id, team: "left" });
-
-      const rightBtn = document.createElement("button");
-      rightBtn.textContent = "⬅️";
-      rightBtn.onclick = () => socket.emit("setTeam", { id, team: "right" });
-
-      const kickBtn = document.createElement("button");
-      kickBtn.textContent = "⚠️";
-      kickBtn.onclick = () => socket.emit("kickPlayer", id);
-
-      const minus = document.createElement("button");
-      minus.textContent = "➖";
-      minus.onclick = () => socket.emit("adjustScore", { id, delta: -1 });
-
-      const plus = document.createElement("button");
-      plus.textContent = "➕";
-      plus.onclick = () => socket.emit("adjustScore", { id, delta: 1 });
-
-      btns.append(leftBtn, rightBtn, kickBtn, minus, plus);
-      box.append(nm, btns);
-      noTeam.appendChild(box);
-    });
-  }
-
-  if (lastBuzzState) setBuzzVisual(lastBuzzState);
-});
   // =========================
   // شكل الزر حسب الحالة
   // =========================
@@ -583,6 +578,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (openLeftBtn) openLeftBtn.onclick = () => socket.emit("openTeamBuzz", "left");
   if (lockRightBtn) lockRightBtn.onclick = () => socket.emit("lockTeamBuzz", "right");
   if (openRightBtn) openRightBtn.onclick = () => socket.emit("openTeamBuzz", "right");
+
   if (leftWidgetToggleMode) {
     leftWidgetToggleMode.onclick = () => socket.emit("toggleTeamWidgetMode", "left");
   }
@@ -663,19 +659,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const mediaVideo = document.getElementById("mediaVideo") || document.getElementById("stageVideo");
   const mediaPlaceholder = document.getElementById("mediaPlaceholder");
 
-const btnShareScreen = document.getElementById("btnShareScreen") || document.getElementById("shareScreenBtn");
-const btnAddImage    = document.getElementById("btnAddImage")    || document.getElementById("addImageBtn");
-const btnAddLink     = document.getElementById("btnAddLink")     || document.getElementById("addLinkBtn");
-const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.getElementById("removeMediaBtn");
+  const btnShareScreen = document.getElementById("btnShareScreen") || document.getElementById("shareScreenBtn");
+  const btnAddImage = document.getElementById("btnAddImage") || document.getElementById("addImageBtn");
+  const btnAddLink = document.getElementById("btnAddLink") || document.getElementById("addLinkBtn");
+  const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.getElementById("removeMediaBtn");
+
   let hostStream = null;
-  let pcs = {}; // host: guestId -> RTCPeerConnection
+  let pcs = {};
   let guestPc = null;
+  let snapshotTimer = null;
+  let latestSnapshot = "";
 
   function hideAllMedia() {
-  if (mediaFrame) mediaFrame.classList.add("hidden");
-  if (mediaImg) mediaImg.classList.add("hidden");
-  if (mediaVideo) mediaVideo.classList.add("hidden");
-  if (mediaPlaceholder) mediaPlaceholder.classList.add("hidden");
+    if (mediaFrame) mediaFrame.classList.add("hidden");
+    if (mediaImg) mediaImg.classList.add("hidden");
+    if (mediaVideo) mediaVideo.classList.add("hidden");
+    if (mediaPlaceholder) mediaPlaceholder.classList.add("hidden");
   }
 
   function updateRemoveBtn(state) {
@@ -684,36 +683,88 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
     btnRemoveMedia.classList.toggle("hidden", !show);
   }
 
-    function showPlaceholderForGuest(state) {
-  if (!mediaPlaceholder) return;
+  function showPlaceholderForGuest(state) {
+    if (!mediaPlaceholder) return;
 
-  if (!isHost && (!state || state.type === "none")) {
-    mediaPlaceholder.textContent = "اشغل وقتك بالاستغفار و التسبيح و ذكر الله 🤍. 'الله اكبر' ";
-    mediaPlaceholder.classList.remove("hidden");
-  } else {
-    mediaPlaceholder.classList.add("hidden");
+    if (!isHost && (!state || state.type === "none")) {
+      mediaPlaceholder.textContent = "اشغل وقتك بالاستغفار و التسبيح و ذكر الله 🤍. 'الله اكبر' ";
+      mediaPlaceholder.classList.remove("hidden");
+    } else {
+      mediaPlaceholder.classList.add("hidden");
     }
   }
 
   function stopShareLocalOnly() {
-    // اقفل اتصالات
+    if (snapshotTimer) {
+      clearInterval(snapshotTimer);
+      snapshotTimer = null;
+    }
+
+    latestSnapshot = "";
+
     Object.values(pcs).forEach((pc) => {
       try { pc.close(); } catch (e) {}
     });
     pcs = {};
 
+    if (guestPc) {
+      try { guestPc.close(); } catch (e) {}
+      guestPc = null;
+    }
+
     if (hostStream) {
       hostStream.getTracks().forEach((t) => t.stop());
       hostStream = null;
     }
+
     if (mediaVideo) mediaVideo.srcObject = null;
+  }
+
+  function startSnapshotLoop() {
+    if (!hostStream) return;
+
+    if (snapshotTimer) {
+      clearInterval(snapshotTimer);
+      snapshotTimer = null;
+    }
+
+    const snapVideo = document.createElement("video");
+    snapVideo.srcObject = hostStream;
+    snapVideo.muted = true;
+    snapVideo.playsInline = true;
+
+    snapVideo.play().catch(() => {});
+
+    snapshotTimer = setInterval(() => {
+      try {
+        if (!snapVideo.videoWidth || !snapVideo.videoHeight) return;
+
+        const canvas = document.createElement("canvas");
+        const maxWidth = 960;
+        const scale = Math.min(1, maxWidth / snapVideo.videoWidth);
+
+        canvas.width = Math.floor(snapVideo.videoWidth * scale);
+        canvas.height = Math.floor(snapVideo.videoHeight * scale);
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        ctx.drawImage(snapVideo, 0, 0, canvas.width, canvas.height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
+
+        latestSnapshot = dataUrl;
+        socket.emit("screenSnapshot", dataUrl);
+      } catch (e) {
+        console.error("snapshot error", e);
+      }
+    }, 1000);
   }
 
   socket.on("mediaState", (state) => {
     hideAllMedia();
     updateRemoveBtn(state);
     showPlaceholderForGuest(state);
-
 
     if (!state || state.type === "none") {
       if (isHost && hostStream) stopShareLocalOnly();
@@ -732,27 +783,49 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
       return;
     }
 
-    if (state.type === "screen" && mediaVideo) {
-  mediaVideo.classList.remove("hidden");
+    if (state.type === "screen") {
+      const isPlayStation = /PlayStation/i.test(navigator.userAgent);
+      const hasWebRTC = !!window.RTCPeerConnection;
 
-  const isPlayStation = /PlayStation/i.test(navigator.userAgent);
-  const hasWebRTC = !!window.RTCPeerConnection;
-
-  if (!isHost) {
-    if (isPlayStation || !hasWebRTC) {
-      if (mediaPlaceholder) {
-        mediaPlaceholder.textContent = "مشاركة الشاشة غير مدعومة على هذا المتصفح";
-        mediaPlaceholder.classList.remove("hidden");
+      if (isHost) {
+        if (mediaVideo) mediaVideo.classList.remove("hidden");
+        return;
       }
-      mediaVideo.classList.add("hidden");
+
+      if (isPlayStation || !hasWebRTC) {
+        if (mediaImg) {
+          mediaImg.classList.remove("hidden");
+          if (latestSnapshot) mediaImg.src = latestSnapshot;
+        }
+        if (mediaPlaceholder) {
+          mediaPlaceholder.textContent = "جاري تحميل صور الشاشة...";
+          mediaPlaceholder.classList.add("hidden");
+        }
+        return;
+      }
+
+      if (mediaVideo) mediaVideo.classList.remove("hidden");
+      socket.emit("screenJoin");
       return;
     }
+  });
 
-    socket.emit("screenJoin");
-  }
+  socket.on("screenSnapshot", (dataUrl) => {
+    const isPlayStation = /PlayStation/i.test(navigator.userAgent);
+    const hasWebRTC = !!window.RTCPeerConnection;
 
-  return;
-}
+    if (isHost) return;
+    if (!dataUrl) return;
+
+    latestSnapshot = dataUrl;
+
+    if (isPlayStation || !hasWebRTC) {
+      hideAllMedia();
+      if (mediaImg) {
+        mediaImg.src = dataUrl;
+        mediaImg.classList.remove("hidden");
+      }
+    }
   });
 
   // ===== HOST buttons (التحكم فقط للمقدم) =====
@@ -787,6 +860,7 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
     if (!stream) return;
 
     hostStream = stream;
+    startSnapshotLoop();
 
     if (mediaVideo) {
       mediaVideo.srcObject = hostStream;
@@ -797,7 +871,6 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
 
     socket.emit("setMedia", { type: "screen", src: "" });
 
-    // إذا المستخدم وقف المشاركة من النظام
     hostStream.getVideoTracks()[0].addEventListener("ended", () => {
       socket.emit("setMedia", { type: "none", src: "" });
       stopShareLocalOnly();
@@ -855,13 +928,13 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
 
     guestPc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-   guestPc.ontrack = (e) => {
-  if (mediaVideo) {
-    mediaVideo.srcObject = e.streams[0];
-    mediaVideo.muted = true;
-    mediaVideo.classList.remove("hidden");
-    if (mediaPlaceholder) mediaPlaceholder.classList.add("hidden");
-    mediaVideo.play().catch(() => {});
+    guestPc.ontrack = (e) => {
+      if (mediaVideo) {
+        mediaVideo.srcObject = e.streams[0];
+        mediaVideo.muted = true;
+        mediaVideo.classList.remove("hidden");
+        if (mediaPlaceholder) mediaPlaceholder.classList.add("hidden");
+        mediaVideo.play().catch(() => {});
       }
     };
 
