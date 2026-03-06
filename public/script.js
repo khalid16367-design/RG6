@@ -45,6 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const gRightCount = document.getElementById("gRightCount");
   const gLeftPlayers = document.getElementById("gLeftPlayers");
   const gRightPlayers = document.getElementById("gRightPlayers");
+  const gNoTeamPlayers = document.getElementById("gNoTeamPlayers");
   const gLeftCard = document.getElementById("gLeftCard");
   const gRightCard = document.getElementById("gRightCard");
   const gLeftName = document.getElementById("gLeftName");
@@ -350,6 +351,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (gLeftPlayers) gLeftPlayers.innerHTML = "";
     if (gRightPlayers) gRightPlayers.innerHTML = "";
+    if (gNoTeamPlayers) gNoTeamPlayers.innerHTML = "";
 
     let l = 0, r = 0;
     Object.values(players).forEach((p) => {
@@ -365,13 +367,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      if (p.team === "right") {
-        r++;
-        if (gRightPlayers) {
+      
+      if (p.team !== "left" && p.team !== "right") {
+        if (gNoTeamPlayers) {
           const row = document.createElement("div");
           row.className = "player-item";
           row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
-          gRightPlayers.appendChild(row);
+          gNoTeamPlayers.appendChild(row);
+
         }
       }
     });
@@ -674,7 +677,7 @@ const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.get
   if (!mediaPlaceholder) return;
 
   if (!isHost && (!state || state.type === "none")) {
-    mediaPlaceholder.textContent = "لا يوجد محتوى حالياً";
+    mediaPlaceholder.textContent = "اشغل وقتك بالاستغفار و التسبيح و ذكر الله 🤍. 'الله اكبر' ";
     mediaPlaceholder.classList.remove("hidden");
   } else {
     mediaPlaceholder.classList.add("hidden");
