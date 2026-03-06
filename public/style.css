@@ -691,8 +691,8 @@ body.beige{ background:#f3e8d8; }
 }
 /* ===== شاشة العرض الكبيرة ===== */
 .media-screen{
-  width: 92%;
-  height: 60vh;            /* شبه حجم الشاشة */
+  width: 64%;
+  height: 75vh;            /* شبه حجم الشاشة */
   margin: 18px auto;
   background: #111;
   border-radius: 18px;
