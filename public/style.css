@@ -822,3 +822,77 @@ body.beige{ background:#f3e8d8; }
   position: relative !important;
   inset: auto !important;
 }
+/* ===== Team Widget: Timer / Point ===== */
+.team-widget-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:12px;
+}
+
+.team-widget-box{
+  flex:1;
+  background:#fff;
+  border:3px solid #111;
+  border-radius:14px;
+  padding:10px 12px;
+  text-align:center;
+  font-weight:900;
+  min-height:52px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.guest-widget-box{
+  margin-bottom:12px;
+}
+
+.team-widget-side{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.team-widget-side-btn{
+  border:3px solid #111;
+  border-radius:12px;
+  padding:8px 10px;
+  background:#fff;
+  font-weight:900;
+  cursor:pointer;
+  min-width:92px;
+}
+
+.team-widget-main{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.team-widget-label{
+  font-size:18px;
+  font-weight:900;
+}
+
+.team-widget-input{
+  width:90px;
+  padding:6px 8px;
+  border:2px solid #111;
+  border-radius:10px;
+  text-align:center;
+  font-weight:900;
+  font-size:16px;
+}
+
+.team-widget-btn{
+  border:2px solid #111;
+  border-radius:10px;
+  padding:6px 10px;
+  background:#f3f3f3;
+  font-weight:900;
+  cursor:pointer;
+}
