@@ -29,7 +29,57 @@ let buzzerTimer = null;
 
 // ====== MEDIA / SCREEN (الجديد) ======
 let hostSocketId = null; // المقدم الحالي
-let mediaState = { type: "none", src: "" }; // none | image | url | screen
+let mediaState = { type: "none", src: "" }; // none | image | url | 
+
+// ===== Widgets: Timer / Point لكل فريق =====
+let teamWidgets = {
+  left:  { visible: true, mode: "timer", seconds: 15, running: false, points: 0 },
+  right: { visible: true, mode: "timer", seconds: 15, running: false, points: 0 },
+};
+
+let teamWidgetIntervals = {
+  left: null,
+  right: null,
+};
+
+function emitTeamWidgets() {
+  io.emit("teamWidgets", teamWidgets);
+}
+
+function stopTeamWidgetTimer(team) {
+  if (teamWidgetIntervals[team]) {
+    clearInterval(teamWidgetIntervals[team]);
+    teamWidgetIntervals[team] = null;
+  }
+  teamWidgets[team].running = false;
+}
+
+function startTeamWidgetTimer(team) {
+  if (team !== "left" && team !== "right") return;
+  if (teamWidgets[team].running) return;
+
+  teamWidgets[team].running = true;
+  emitTeamWidgets();
+
+  teamWidgetIntervals[team] = setInterval(() => {
+    if (teamWidgets[team].seconds > 0) {
+      teamWidgets[team].seconds--;
+      emitTeamWidgets();
+    }
+
+    if (teamWidgets[team].seconds <= 0) {
+      stopTeamWidgetTimer(team);
+      emitTeamWidgets();
+    }
+  }, 1000);
+}
+
+function resetTeamWidgetTimer(team) {
+  if (team !== "left" && team !== "right") return;
+  stopTeamWidgetTimer(team);
+  teamWidgets[team].seconds = 15;
+  emitTeamWidgets();
+}
 
 function parseTurnUrls(str) {
   // يسمح لك تحط أكثر من رابط مفصول بفاصلة
@@ -145,7 +195,49 @@ io.on("connection", (socket) => {
   socket.emit("updateRequests", joinRequests);
   socket.emit("updatePlayers", players);
   socket.emit("buzzState", buzzState);
+  socket.emit("teamWidgets", teamWidgets);
 
+    /* ======================
+     Timer / Point Widgets
+  ====================== */
+  socket.on("toggleTeamWidgetMode", (team) => {
+    if (team !== "left" && team !== "right") return;
+
+    teamWidgets[team].mode = teamWidgets[team].mode === "timer" ? "point" : "timer";
+    emitTeamWidgets();
+  });
+
+  socket.on("toggleTeamWidgetVisible", (team) => {
+    if (team !== "left" && team !== "right") return;
+
+    teamWidgets[team].visible = !teamWidgets[team].visible;
+    emitTeamWidgets();
+  });
+
+  socket.on("setTeamWidgetPoints", ({ team, value }) => {
+    if (team !== "left" && team !== "right") return;
+
+    const num = Number(value);
+    teamWidgets[team].points = Number.isFinite(num) ? num : 0;
+    emitTeamWidgets();
+  });
+
+  socket.on("startTeamWidgetTimer", (team) => {
+    if (team !== "left" && team !== "right") return;
+    startTeamWidgetTimer(team);
+  });
+
+  socket.on("stopTeamWidgetTimer", (team) => {
+    if (team !== "left" && team !== "right") return;
+    stopTeamWidgetTimer(team);
+    emitTeamWidgets();
+  });
+
+  socket.on("resetTeamWidgetTimer", (team) => {
+    if (team !== "left" && team !== "right") return;
+    resetTeamWidgetTimer(team);
+  });
+  
   /* ======================
      تحديث اسم/لون الفرق من المقدم
   ====================== */
@@ -406,6 +498,13 @@ io.on("connection", (socket) => {
       mediaState = { type: "none", src: "" };
       io.emit("mediaState", mediaState);
       console.log("👑 Host left, media cleared");
+    }
+    
+    // أوقف مؤقتات الودجت إذا طلع المقدم
+    if (socket.id === hostSocketId) {
+      stopTeamWidgetTimer("left");
+      stopTeamWidgetTimer("right");
+      emitTeamWidgets();
     }
 
     console.log("🔴 disconnected:", socket.id);
