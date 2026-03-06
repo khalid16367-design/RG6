@@ -6,10 +6,10 @@ const io = require("socket.io")(http);
 app.use(express.static("public"));
 
 // ===== الطلبات =====
-let joinRequests = []; // { id, name }
+let joinRequests = [];
 
 // ===== نظام الفرق =====
-let players = {}; // socketId: { name, team: null|"left"|"right", correctCount }
+let players = {};
 let teamChoiceLocked = false;
 
 let teamSettings = {
@@ -20,16 +20,17 @@ let teamSettings = {
 // ===== نظام الزر =====
 let buzzState = {
   locked: false,
-  lockedBy: null, // { id, name, team }
-  allowedTeam: "both", // "both" | "left" | "right"
+  lockedBy: null,
+  allowedTeam: "both",
   disabledTeams: { left: false, right: false },
 };
 
 let buzzerTimer = null;
 
-// ====== MEDIA / SCREEN (الجديد) ======
-let hostSocketId = null; // المقدم الحالي
-let mediaState = { type: "none", src: "" }; // none | image | url | 
+// ====== MEDIA / SCREEN ======
+let hostSocketId = null;
+let mediaState = { type: "none", src: "" };
+let latestSnapshot = "";
 
 // ===== Widgets: Timer / Point لكل فريق =====
 let teamWidgets = {
@@ -82,10 +83,9 @@ function resetTeamWidgetTimer(team) {
 }
 
 function parseTurnUrls(str) {
-  // يسمح لك تحط أكثر من رابط مفصول بفاصلة
   return String(str || "")
     .split(",")
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
 }
 
@@ -95,8 +95,6 @@ function buildIceServers() {
     { urls: "stun:stun1.l.google.com:19302" },
   ];
 
-  // TURN من ENV (Render)
-  // TURN_URLS مثال: "turn:global.relay.metered.ca:80?transport=udp,turn:global.relay.metered.ca:443?transport=tcp,turns:global.relay.metered.ca:443?transport=tcp"
   const urls = parseTurnUrls(process.env.TURN_URLS);
   const user = process.env.TURN_USER;
   const pass = process.env.TURN_PASS;
@@ -112,7 +110,6 @@ function buildIceServers() {
   return servers;
 }
 
-// أرسل الحالة للجميع
 function emitBuzzState() {
   io.emit("buzzState", buzzState);
 }
@@ -140,45 +137,56 @@ function resetBuzz(full = false) {
 io.on("connection", (socket) => {
   console.log("🟢 connected:", socket.id);
 
-  // ====== أرسل إعدادات ICE (STUN/TURN) لكل شخص ======
+  socket.on("screenSnapshot", (dataUrl) => {
+    latestSnapshot = String(dataUrl || "");
+    socket.broadcast.emit("screenSnapshot", latestSnapshot);
+  });
+
   socket.emit("iceServers", buildIceServers());
 
-  // ====== MEDIA: أرسل الحالة الحالية أول ما يدخل ======
   socket.emit("mediaState", mediaState);
+  if (mediaState.type === "screen" && latestSnapshot) {
+    socket.emit("screenSnapshot", latestSnapshot);
+  }
 
-  // ====== تسجيل المقدم ======
   socket.on("registerHost", () => {
     hostSocketId = socket.id;
     console.log("👑 Host registered:", hostSocketId);
-
-    // لما يسجل نفسه مقدم نعطيه الحالة الحالية
     socket.emit("mediaState", mediaState);
+
+    if (mediaState.type === "screen" && latestSnapshot) {
+      socket.emit("screenSnapshot", latestSnapshot);
+    }
   });
 
-  // ====== المقدم فقط يقدر يغير media ======
   socket.on("setMedia", (state) => {
-    if (socket.id !== hostSocketId) return; // ✅ فقط المقدم
+    if (socket.id !== hostSocketId) return;
     if (!state || !state.type) return;
 
     mediaState = { type: state.type, src: String(state.src || "") };
+
+    if (mediaState.type !== "screen") {
+      latestSnapshot = "";
+    }
+
     io.emit("mediaState", mediaState);
+
+    if (mediaState.type === "screen" && latestSnapshot) {
+      io.emit("screenSnapshot", latestSnapshot);
+    }
   });
 
-  // ====== WebRTC signaling relay (Offer/Answer/ICE) ======
-  // الضيف يطلب اتصال شاشة
   socket.on("screenJoin", () => {
     if (!hostSocketId) return;
     io.to(hostSocketId).emit("screenJoin", { guestId: socket.id });
   });
 
-  // offer من المقدم فقط
   socket.on("webrtcOffer", ({ to, sdp }) => {
     if (socket.id !== hostSocketId) return;
     if (!to || !sdp) return;
     io.to(to).emit("webrtcOffer", { from: socket.id, sdp });
   });
 
-  // answer من أي ضيف -> للمقدم
   socket.on("webrtcAnswer", ({ to, sdp }) => {
     if (!to || !sdp) return;
     io.to(to).emit("webrtcAnswer", { from: socket.id, sdp });
@@ -189,7 +197,6 @@ io.on("connection", (socket) => {
     io.to(to).emit("webrtcIce", { from: socket.id, ice });
   });
 
-  // ====== إرسال الحالة عند الدخول (باقي مشروعك كما هو) ======
   socket.emit("teamLockStatus", teamChoiceLocked);
   socket.emit("teamSettings", teamSettings);
   socket.emit("updateRequests", joinRequests);
@@ -197,7 +204,7 @@ io.on("connection", (socket) => {
   socket.emit("buzzState", buzzState);
   socket.emit("teamWidgets", teamWidgets);
 
-    /* ======================
+  /* ======================
      Timer / Point Widgets
   ====================== */
   socket.on("toggleTeamWidgetMode", (team) => {
@@ -237,7 +244,7 @@ io.on("connection", (socket) => {
     if (team !== "left" && team !== "right") return;
     resetTeamWidgetTimer(team);
   });
-  
+
   /* ======================
      تحديث اسم/لون الفرق من المقدم
   ====================== */
@@ -265,7 +272,6 @@ io.on("connection", (socket) => {
     const clean = String(name || "").trim();
     if (!clean) return;
 
-    // ✅ إذا هذا أول لاعب يدخل (بداية جديدة) رجّع الزر للوضع الطبيعي
     if (Object.keys(players).length === 0) {
       resetBuzz(true);
     }
@@ -283,7 +289,7 @@ io.on("connection", (socket) => {
   });
 
   /* ======================
-     ✅ قبول/رفض الطلبات
+     قبول/رفض الطلبات
   ====================== */
   socket.on("acceptRequest", (id) => {
     io.to(id).emit("requestAccepted");
@@ -432,7 +438,7 @@ io.on("connection", (socket) => {
   });
 
   /* ======================
-     تحكم المقدم بالزر (صور)
+     تحكم المقدم بالزر
   ====================== */
   socket.on("resetBuzz", () => resetBuzz(true));
 
@@ -450,20 +456,18 @@ io.on("connection", (socket) => {
   });
 
   socket.on("openTeamBuzz", (team) => {
-  if (team !== "left" && team !== "right") return;
+    if (team !== "left" && team !== "right") return;
 
-  // افتح اللعب لفريق واحد فقط
-  // بدون ما نغيّر قفل الفريق الثاني
-  buzzState.allowedTeam = team;
-  buzzState.disabledTeams[team] = false;
+    buzzState.allowedTeam = team;
+    buzzState.disabledTeams[team] = false;
 
-  buzzState.locked = false;
-  buzzState.lockedBy = null;
+    buzzState.locked = false;
+    buzzState.lockedBy = null;
 
-  io.emit("timer", 0);
-  io.emit("reset");
-  emitBuzzState();
-});
+    io.emit("timer", 0);
+    io.emit("reset");
+    emitBuzzState();
+  });
 
   socket.on("reset", () => {
     buzzState.locked = false;
@@ -479,6 +483,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    const wasHost = socket.id === hostSocketId;
+
     joinRequests = joinRequests.filter((r) => r.id !== socket.id);
     delete players[socket.id];
 
@@ -491,20 +497,17 @@ io.on("connection", (socket) => {
       emitBuzzState();
     }
 
-    // إذا المقدم طلع
-    if (socket.id === hostSocketId) {
+    if (wasHost) {
       hostSocketId = null;
-      // اختياري: ترجع الميديا فاضية إذا المقدم طلع
       mediaState = { type: "none", src: "" };
+      latestSnapshot = "";
       io.emit("mediaState", mediaState);
-      console.log("👑 Host left, media cleared");
-    }
-    
-    // أوقف مؤقتات الودجت إذا طلع المقدم
-    if (socket.id === hostSocketId) {
+
       stopTeamWidgetTimer("left");
       stopTeamWidgetTimer("right");
       emitTeamWidgets();
+
+      console.log("👑 Host left, media cleared");
     }
 
     console.log("🔴 disconnected:", socket.id);
@@ -514,4 +517,3 @@ io.on("connection", (socket) => {
 http.listen(3000, () => {
   console.log("🚀 Server running on http://localhost:3000");
 });
-
