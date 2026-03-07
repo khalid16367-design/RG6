@@ -139,10 +139,13 @@ io.on("connection", (socket) => {
 
   socket.on("screenSnapshot", (dataUrl) => {
     latestSnapshot = String(dataUrl || "");
+    console.log("🖼️ screenSnapshot from:", socket.id, "size:", latestSnapshot.length);
     socket.broadcast.emit("screenSnapshot", latestSnapshot);
   });
 
-  socket.emit("iceServers", buildIceServers());
+  const iceServers = buildIceServers();
+  console.log("🧊 ICE for client:", socket.id, JSON.stringify(iceServers, null, 2));
+  socket.emit("iceServers", iceServers);
 
   socket.emit("mediaState", mediaState);
   if (mediaState.type === "screen" && latestSnapshot) {
@@ -169,6 +172,8 @@ io.on("connection", (socket) => {
       latestSnapshot = "";
     }
 
+    console.log("📺 setMedia from host:", socket.id, mediaState);
+
     io.emit("mediaState", mediaState);
 
     if (mediaState.type === "screen" && latestSnapshot) {
@@ -178,22 +183,26 @@ io.on("connection", (socket) => {
 
   socket.on("screenJoin", () => {
     if (!hostSocketId) return;
+    console.log("🖥️ screenJoin from guest:", socket.id, "=> host:", hostSocketId);
     io.to(hostSocketId).emit("screenJoin", { guestId: socket.id });
   });
 
   socket.on("webrtcOffer", ({ to, sdp }) => {
     if (socket.id !== hostSocketId) return;
     if (!to || !sdp) return;
+    console.log("📨 webrtcOffer:", { from: socket.id, to });
     io.to(to).emit("webrtcOffer", { from: socket.id, sdp });
   });
 
   socket.on("webrtcAnswer", ({ to, sdp }) => {
     if (!to || !sdp) return;
+    console.log("📩 webrtcAnswer:", { from: socket.id, to });
     io.to(to).emit("webrtcAnswer", { from: socket.id, sdp });
   });
 
   socket.on("webrtcIce", ({ to, ice }) => {
     if (!to || !ice) return;
+    console.log("🧊 webrtcIce:", { from: socket.id, to });
     io.to(to).emit("webrtcIce", { from: socket.id, ice });
   });
 
