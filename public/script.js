@@ -669,6 +669,41 @@ document.addEventListener("DOMContentLoaded", () => {
   let guestPc = null;
   let snapshotTimer = null;
   let latestSnapshot = "";
+  let useSnapshotFallback = false;
+  let webrtcConnected = false;
+  let webrtcWaitTimer = null;
+
+  function clearWebRTCWaitTimer() {
+    if (webrtcWaitTimer) {
+      clearTimeout(webrtcWaitTimer);
+      webrtcWaitTimer = null;
+    }
+  }
+
+  function startWebRTCFallbackTimer() {
+    clearWebRTCWaitTimer();
+
+    webrtcWaitTimer = setTimeout(() => {
+      if (!isHost && !webrtcConnected) {
+        useSnapshotFallback = true;
+
+        if (guestPc) {
+          try { guestPc.close(); } catch (e) {}
+          guestPc = null;
+        }
+
+        hideAllMedia();
+
+        if (latestSnapshot && mediaImg) {
+          mediaImg.src = latestSnapshot;
+          mediaImg.classList.remove("hidden");
+        } else if (mediaPlaceholder) {
+          mediaPlaceholder.textContent = "تعذر تشغيل البث المباشر، تم التحويل لوضع الصور";
+          mediaPlaceholder.classList.remove("hidden");
+        }
+      }
+    }, 4000);
+  }
 
   function hideAllMedia() {
     if (mediaFrame) mediaFrame.classList.add("hidden");
@@ -701,6 +736,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     latestSnapshot = "";
+    webrtcConnected = false;
+    useSnapshotFallback = false;
+    clearWebRTCWaitTimer();
 
     Object.values(pcs).forEach((pc) => {
       try { pc.close(); } catch (e) {}
@@ -767,6 +805,15 @@ document.addEventListener("DOMContentLoaded", () => {
     showPlaceholderForGuest(state);
 
     if (!state || state.type === "none") {
+      webrtcConnected = false;
+      useSnapshotFallback = false;
+      clearWebRTCWaitTimer();
+
+      if (!isHost && guestPc) {
+        try { guestPc.close(); } catch (e) {}
+        guestPc = null;
+      }
+
       if (isHost && hostStream) stopShareLocalOnly();
       return;
     }
@@ -784,47 +831,35 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (state.type === "screen") {
-      const isPlayStation = /PlayStation/i.test(navigator.userAgent);
-      const hasWebRTC = !!window.RTCPeerConnection;
-
       if (isHost) {
         if (mediaVideo) mediaVideo.classList.remove("hidden");
         return;
       }
 
-      if (isPlayStation || !hasWebRTC) {
-        if (mediaImg) {
-          mediaImg.classList.remove("hidden");
-          if (latestSnapshot) mediaImg.src = latestSnapshot;
-        }
-        if (mediaPlaceholder) {
-          mediaPlaceholder.textContent = "جاري تحميل صور الشاشة...";
-          mediaPlaceholder.classList.add("hidden");
-        }
-        return;
-      }
+      webrtcConnected = false;
+      useSnapshotFallback = false;
+      clearWebRTCWaitTimer();
 
       if (mediaVideo) mediaVideo.classList.remove("hidden");
+
       socket.emit("screenJoin");
+      startWebRTCFallbackTimer();
       return;
     }
   });
 
   socket.on("screenSnapshot", (dataUrl) => {
-    const isPlayStation = /PlayStation/i.test(navigator.userAgent);
-    const hasWebRTC = !!window.RTCPeerConnection;
-
     if (isHost) return;
     if (!dataUrl) return;
 
     latestSnapshot = dataUrl;
 
-    if (isPlayStation || !hasWebRTC) {
-      hideAllMedia();
-      if (mediaImg) {
-        mediaImg.src = dataUrl;
-        mediaImg.classList.remove("hidden");
-      }
+    if (!useSnapshotFallback) return;
+
+    hideAllMedia();
+    if (mediaImg) {
+      mediaImg.src = dataUrl;
+      mediaImg.classList.remove("hidden");
     }
   });
 
@@ -926,14 +961,22 @@ document.addEventListener("DOMContentLoaded", () => {
       guestPc = null;
     }
 
+    clearWebRTCWaitTimer();
+    startWebRTCFallbackTimer();
+
     guestPc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
     guestPc.ontrack = (e) => {
+      webrtcConnected = true;
+      useSnapshotFallback = false;
+      clearWebRTCWaitTimer();
+
       if (mediaVideo) {
         mediaVideo.srcObject = e.streams[0];
         mediaVideo.muted = true;
         mediaVideo.classList.remove("hidden");
         if (mediaPlaceholder) mediaPlaceholder.classList.add("hidden");
+        if (mediaImg) mediaImg.classList.add("hidden");
         mediaVideo.play().catch(() => {});
       }
     };
