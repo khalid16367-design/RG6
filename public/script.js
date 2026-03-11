@@ -36,6 +36,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const nameInput = document.getElementById("playerName");
   const sendRequestBtn = document.getElementById("sendRequestBtn");
 
+// ===== تنبيه قبل الخروج للضيف =====
+window.addEventListener("beforeunload", (e) => {
+  if (!isHost) {
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
+
   // ====== الضيف: فرق ======
   const gJoinLeft = document.getElementById("gJoinLeft");
   const gJoinRight = document.getElementById("gJoinRight");
