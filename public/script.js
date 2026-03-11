@@ -44,6 +44,27 @@ window.addEventListener("beforeunload", (e) => {
   }
 });
 
+// ===== منع الخروج بالرجوع (مهم للسوني) =====
+if (!isHost) {
+
+  // نضيف صفحة وهمية في التاريخ
+  history.pushState(null, "", location.href);
+
+  window.addEventListener("popstate", function () {
+
+    const leave = confirm("متأكد أنك تريد الخروج من الموقع؟");
+
+    if (leave) {
+      window.location.href = "/";
+    } else {
+      // يرجع المستخدم لنفس الصفحة
+      history.pushState(null, "", location.href);
+    }
+
+  });
+
+}
+
   // ====== الضيف: فرق ======
   const gJoinLeft = document.getElementById("gJoinLeft");
   const gJoinRight = document.getElementById("gJoinRight");
