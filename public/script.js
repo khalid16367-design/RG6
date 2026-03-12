@@ -143,6 +143,8 @@ if (!isHost) {
   // ====== زر اللعبة ======
   const buzzBtn = document.getElementById("buzzBtn");
 
+  const shareBtn = document.getElementById("shareBtn");
+
   // ====== بيانات ======
   let playerName = "";
   let currentTeamSettings = null;
@@ -1020,4 +1022,35 @@ if (!isHost) {
 
     socket.emit("webrtcAnswer", { to: from, sdp: guestPc.localDescription });
   });
+
+  // ===== زر المشاركة للجوال =====
+if (shareBtn) {
+  shareBtn.addEventListener("click", async () => {
+
+    const shareData = {
+      title: "RG6 Button",
+      text: "ادخل اللعبة",
+      url: window.location.href
+    };
+
+    try {
+
+      // مشاركة أصلية للجوال
+      if (navigator.share) {
+        await navigator.share(shareData);
+      }
+
+      // fallback لو المتصفح ما يدعم
+      else {
+        await navigator.clipboard.writeText(window.location.href);
+        alert("تم نسخ رابط اللعبة 📋");
+      }
+
+    } catch (err) {
+      console.log("share cancelled");
+    }
+
+  });
+}
+
 });
