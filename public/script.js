@@ -36,34 +36,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const nameInput = document.getElementById("playerName");
   const sendRequestBtn = document.getElementById("sendRequestBtn");
 
-// ===== تنبيه قبل الخروج للضيف =====
-window.addEventListener("beforeunload", (e) => {
-  if (!isHost) {
-    e.preventDefault();
-    e.returnValue = "";
-  }
-});
-
-// ===== منع الخروج بالرجوع (مهم للسوني) =====
-if (!isHost) {
-
-  // نضيف صفحة وهمية في التاريخ
-  history.pushState(null, "", location.href);
-
-  window.addEventListener("popstate", function () {
-
-    const leave = confirm("متأكد أنك تريد الخروج من الموقع؟");
-
-    if (leave) {
-      window.location.href = "/";
-    } else {
-      // يرجع المستخدم لنفس الصفحة
-      history.pushState(null, "", location.href);
+  // ===== تنبيه قبل الخروج للضيف =====
+  window.addEventListener("beforeunload", (e) => {
+    if (!isHost) {
+      e.preventDefault();
+      e.returnValue = "";
     }
-
   });
 
-}
+  // ===== منع الخروج بالرجوع (مهم للسوني) =====
+  if (!isHost) {
+    history.pushState(null, "", location.href);
+
+    window.addEventListener("popstate", function () {
+      const leave = confirm("متأكد أنك تريد الخروج من الموقع؟");
+
+      if (leave) {
+        window.location.href = "/";
+      } else {
+        history.pushState(null, "", location.href);
+      }
+    });
+  }
 
   // ====== الضيف: فرق ======
   const gJoinLeft = document.getElementById("gJoinLeft");
@@ -142,7 +136,6 @@ if (!isHost) {
 
   // ====== زر اللعبة ======
   const buzzBtn = document.getElementById("buzzBtn");
-
   const shareBtn = document.getElementById("shareBtn");
 
   // ====== بيانات ======
@@ -157,7 +150,7 @@ if (!isHost) {
 
   function bindTeamWidgetHostControls(team, state) {
     const startBtn = document.getElementById(`${team}WidgetStartBtn`);
-    const resetBtn = document.getElementById(`${team}WidgetResetBtn`);
+    const resetBtnLocal = document.getElementById(`${team}WidgetResetBtn`);
     const pointInput = document.getElementById(`${team}WidgetPointInput`);
 
     if (startBtn) {
@@ -167,15 +160,15 @@ if (!isHost) {
       };
     }
 
-    if (resetBtn) {
-      resetBtn.onclick = () => socket.emit("resetTeamWidgetTimer", team);
+    if (resetBtnLocal) {
+      resetBtnLocal.onclick = () => socket.emit("resetTeamWidgetTimer", team);
     }
 
     if (pointInput) {
       pointInput.onchange = () => {
         socket.emit("setTeamWidgetPoints", {
           team,
-          value: pointInput.value
+          value: pointInput.value,
         });
       };
     }
@@ -381,7 +374,8 @@ if (!isHost) {
     if (gRightPlayers) gRightPlayers.innerHTML = "";
     if (gNoTeamPlayers) gNoTeamPlayers.innerHTML = "";
 
-    let l = 0, r = 0;
+    let l = 0;
+    let r = 0;
 
     Object.values(players).forEach((p) => {
       const score = p.correctCount || 0;
@@ -720,7 +714,9 @@ if (!isHost) {
         useSnapshotFallback = true;
 
         if (guestPc) {
-          try { guestPc.close(); } catch (e) {}
+          try {
+            guestPc.close();
+          } catch (e) {}
           guestPc = null;
         }
 
@@ -773,12 +769,16 @@ if (!isHost) {
     clearWebRTCWaitTimer();
 
     Object.values(pcs).forEach((pc) => {
-      try { pc.close(); } catch (e) {}
+      try {
+        pc.close();
+      } catch (e) {}
     });
     pcs = {};
 
     if (guestPc) {
-      try { guestPc.close(); } catch (e) {}
+      try {
+        guestPc.close();
+      } catch (e) {}
       guestPc = null;
     }
 
@@ -842,7 +842,9 @@ if (!isHost) {
       clearWebRTCWaitTimer();
 
       if (!isHost && guestPc) {
-        try { guestPc.close(); } catch (e) {}
+        try {
+          guestPc.close();
+        } catch (e) {}
         guestPc = null;
       }
 
@@ -919,71 +921,70 @@ if (!isHost) {
   }
 
   // ===== Screen Share (Host) =====
-  async function startShare() {
-    async function startMobileShare() {
-  try {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      alert("مشاركة الشاشة غير مدعومة في هذا الجهاز أو المتصفح");
-      return;
-    }
+  async function beginShareFlow(preferMobile = false) {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        alert("مشاركة الشاشة غير مدعومة في هذا الجهاز أو المتصفح");
+        return;
+      }
 
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-      audio: false
-    }).catch(() => null);
+      const displayOptions = preferMobile
+        ? {
+            video: {
+              frameRate: { ideal: 15, max: 20 },
+            },
+            audio: false,
+          }
+        : {
+            video: true,
+            audio: false,
+          };
 
-    if (!stream) return;
+      const stream = await navigator.mediaDevices.getDisplayMedia(displayOptions).catch(() => null);
+      if (!stream) return;
 
-    hostStream = stream;
-
-    if (mediaVideo) {
-      mediaVideo.srcObject = hostStream;
-      mediaVideo.muted = true;
-      mediaVideo.classList.remove("hidden");
-      await mediaVideo.play().catch(() => {});
-    }
-
-    socket.emit("setMedia", { type: "screen", src: "" });
-
-    const videoTrack = hostStream.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.addEventListener("ended", () => {
-        socket.emit("setMedia", { type: "none", src: "" });
-        stopShareLocalOnly();
-      });
-    }
-
-  } catch (err) {
-    console.log("mobile share error", err);
-    alert("ما قدرت أبدأ مشاركة الشاشة من هذا الجهاز");
-  }
-}
-    const stream = await navigator.mediaDevices
-      .getDisplayMedia({ video: true, audio: false })
-      .catch(() => null);
-
-    if (!stream) return;
-
-    hostStream = stream;
-    startSnapshotLoop();
-
-    if (mediaVideo) {
-      mediaVideo.srcObject = hostStream;
-      mediaVideo.muted = true;
-      mediaVideo.classList.remove("hidden");
-      await mediaVideo.play().catch(() => {});
-    }
-
-    socket.emit("setMedia", { type: "screen", src: "" });
-
-    hostStream.getVideoTracks()[0].addEventListener("ended", () => {
-      socket.emit("setMedia", { type: "none", src: "" });
       stopShareLocalOnly();
-    });
+
+      hostStream = stream;
+      startSnapshotLoop();
+
+      if (mediaVideo) {
+        mediaVideo.srcObject = hostStream;
+        mediaVideo.muted = true;
+        mediaVideo.classList.remove("hidden");
+        await mediaVideo.play().catch(() => {});
+      }
+
+      socket.emit("setMedia", { type: "screen", src: "" });
+
+      const videoTrack = hostStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.addEventListener("ended", () => {
+          socket.emit("setMedia", { type: "none", src: "" });
+          stopShareLocalOnly();
+        });
+      }
+    } catch (err) {
+      console.log("share screen error", err);
+      alert("ما قدرت أبدأ مشاركة الشاشة من هذا الجهاز");
+    }
   }
 
-  if (isHost && btnShareScreen) btnShareScreen.onclick = startShare;
-  if (isHost && btnShareScreenMobile) btnShareScreenMobile.onclick = startMobileShare;
+  async function startShare() {
+    await beginShareFlow(false);
+  }
+
+  async function startMobileShare() {
+    await beginShareFlow(true);
+  }
+
+  if (isHost && btnShareScreen) {
+    btnShareScreen.onclick = startShare;
+  }
+
+  if (isHost && btnShareScreenMobile) {
+    btnShareScreenMobile.onclick = startMobileShare;
+  }
 
   // ===== Host: guest asks to join => make offer =====
   socket.on("screenJoin", async ({ guestId }) => {
@@ -1015,11 +1016,15 @@ if (!isHost) {
     if (!from || !ice) return;
 
     if (isHost && pcs[from]) {
-      try { await pcs[from].addIceCandidate(new RTCIceCandidate(ice)); } catch (e) {}
+      try {
+        await pcs[from].addIceCandidate(new RTCIceCandidate(ice));
+      } catch (e) {}
     }
 
     if (!isHost && guestPc) {
-      try { await guestPc.addIceCandidate(new RTCIceCandidate(ice)); } catch (e) {}
+      try {
+        await guestPc.addIceCandidate(new RTCIceCandidate(ice));
+      } catch (e) {}
     }
   });
 
@@ -1028,7 +1033,9 @@ if (!isHost) {
     if (isHost || !from || !sdp) return;
 
     if (guestPc) {
-      try { guestPc.close(); } catch (e) {}
+      try {
+        guestPc.close();
+      } catch (e) {}
       guestPc = null;
     }
 
@@ -1064,33 +1071,24 @@ if (!isHost) {
   });
 
   // ===== زر المشاركة للجوال =====
-if (shareBtn) {
-  shareBtn.addEventListener("click", async () => {
+  if (shareBtn) {
+    shareBtn.addEventListener("click", async () => {
+      const shareData = {
+        title: "RG6 Button",
+        text: "ادخل اللعبة",
+        url: window.location.href,
+      };
 
-    const shareData = {
-      title: "RG6 Button",
-      text: "ادخل اللعبة",
-      url: window.location.href
-    };
-
-    try {
-
-      // مشاركة أصلية للجوال
-      if (navigator.share) {
-        await navigator.share(shareData);
+      try {
+        if (navigator.share) {
+          await navigator.share(shareData);
+        } else {
+          await navigator.clipboard.writeText(window.location.href);
+          alert("تم نسخ رابط اللعبة 📋");
+        }
+      } catch (err) {
+        console.log("share cancelled");
       }
-
-      // fallback لو المتصفح ما يدعم
-      else {
-        await navigator.clipboard.writeText(window.location.href);
-        alert("تم نسخ رابط اللعبة 📋");
-      }
-
-    } catch (err) {
-      console.log("share cancelled");
-    }
-
-  });
-}
-
+    });
+  }
 });
