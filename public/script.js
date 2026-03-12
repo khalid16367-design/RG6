@@ -168,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
       pointInput.onchange = () => {
         socket.emit("setTeamWidgetPoints", {
           team,
-          value: pointInput.value,
+          value: pointInput.value
         });
       };
     }
@@ -714,9 +714,7 @@ document.addEventListener("DOMContentLoaded", () => {
         useSnapshotFallback = true;
 
         if (guestPc) {
-          try {
-            guestPc.close();
-          } catch (e) {}
+          try { guestPc.close(); } catch (e) {}
           guestPc = null;
         }
 
@@ -769,16 +767,12 @@ document.addEventListener("DOMContentLoaded", () => {
     clearWebRTCWaitTimer();
 
     Object.values(pcs).forEach((pc) => {
-      try {
-        pc.close();
-      } catch (e) {}
+      try { pc.close(); } catch (e) {}
     });
     pcs = {};
 
     if (guestPc) {
-      try {
-        guestPc.close();
-      } catch (e) {}
+      try { guestPc.close(); } catch (e) {}
       guestPc = null;
     }
 
@@ -842,9 +836,7 @@ document.addEventListener("DOMContentLoaded", () => {
       clearWebRTCWaitTimer();
 
       if (!isHost && guestPc) {
-        try {
-          guestPc.close();
-        } catch (e) {}
+        try { guestPc.close(); } catch (e) {}
         guestPc = null;
       }
 
@@ -920,10 +912,68 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // ===== Screen Share (Host) =====
+  // ===== Screen Share / Mobile Camera Fallback (Host) =====
+  async function startCameraFallback() {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("هذا الجهاز لا يدعم مشاركة الشاشة ولا الكاميرا");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      }).catch(() => null);
+
+      if (!stream) {
+        alert("ما قدرت أفتح كاميرا الجوال");
+        return;
+      }
+
+      stopShareLocalOnly();
+
+      hostStream = stream;
+      startSnapshotLoop();
+
+      if (mediaVideo) {
+        mediaVideo.srcObject = hostStream;
+        mediaVideo.muted = true;
+        mediaVideo.classList.remove("hidden");
+        await mediaVideo.play().catch(() => {});
+      }
+
+      socket.emit("setMedia", { type: "screen", src: "" });
+
+      const videoTrack = hostStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.addEventListener("ended", () => {
+          socket.emit("setMedia", { type: "none", src: "" });
+          stopShareLocalOnly();
+        });
+      }
+    } catch (err) {
+      console.log("camera fallback error", err);
+      alert("تعذر تشغيل كاميرا الجوال");
+    }
+  }
+
   async function beginShareFlow(preferMobile = false) {
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      if (!navigator.mediaDevices) {
+        alert("هذا الجهاز لا يدعم المشاركة");
+        return;
+      }
+
+      if (!navigator.mediaDevices.getDisplayMedia) {
+        if (preferMobile) {
+          await startCameraFallback();
+          return;
+        }
+
         alert("مشاركة الشاشة غير مدعومة في هذا الجهاز أو المتصفح");
         return;
       }
@@ -931,17 +981,23 @@ document.addEventListener("DOMContentLoaded", () => {
       const displayOptions = preferMobile
         ? {
             video: {
-              frameRate: { ideal: 15, max: 20 },
+              frameRate: { ideal: 15, max: 20 }
             },
-            audio: false,
+            audio: false
           }
         : {
             video: true,
-            audio: false,
+            audio: false
           };
 
       const stream = await navigator.mediaDevices.getDisplayMedia(displayOptions).catch(() => null);
-      if (!stream) return;
+
+      if (!stream) {
+        if (preferMobile) {
+          await startCameraFallback();
+        }
+        return;
+      }
 
       stopShareLocalOnly();
 
@@ -966,6 +1022,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (err) {
       console.log("share screen error", err);
+
+      if (preferMobile) {
+        await startCameraFallback();
+        return;
+      }
+
       alert("ما قدرت أبدأ مشاركة الشاشة من هذا الجهاز");
     }
   }
@@ -1016,15 +1078,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!from || !ice) return;
 
     if (isHost && pcs[from]) {
-      try {
-        await pcs[from].addIceCandidate(new RTCIceCandidate(ice));
-      } catch (e) {}
+      try { await pcs[from].addIceCandidate(new RTCIceCandidate(ice)); } catch (e) {}
     }
 
     if (!isHost && guestPc) {
-      try {
-        await guestPc.addIceCandidate(new RTCIceCandidate(ice));
-      } catch (e) {}
+      try { await guestPc.addIceCandidate(new RTCIceCandidate(ice)); } catch (e) {}
     }
   });
 
@@ -1033,9 +1091,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isHost || !from || !sdp) return;
 
     if (guestPc) {
-      try {
-        guestPc.close();
-      } catch (e) {}
+      try { guestPc.close(); } catch (e) {}
       guestPc = null;
     }
 
@@ -1076,7 +1132,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const shareData = {
         title: "RG6 Button",
         text: "ادخل اللعبة",
-        url: window.location.href,
+        url: window.location.href
       };
 
       try {
