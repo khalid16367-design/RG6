@@ -918,3 +918,13 @@ body.beige{ background:#f3e8d8; }
   flex-direction: column;
   gap: 10px;
 }
+
+.share-btn{
+  margin-right:12px;
+  padding:10px 14px;
+  border-radius:12px;
+  border:3px solid #111;
+  background:#fff;
+  font-weight:900;
+  cursor:pointer;
+}
