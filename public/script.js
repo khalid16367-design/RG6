@@ -691,6 +691,7 @@ if (!isHost) {
   const mediaPlaceholder = document.getElementById("mediaPlaceholder");
 
   const btnShareScreen = document.getElementById("btnShareScreen") || document.getElementById("shareScreenBtn");
+  const btnShareScreenMobile = document.getElementById("btnShareScreenMobile");
   const btnAddImage = document.getElementById("btnAddImage") || document.getElementById("addImageBtn");
   const btnAddLink = document.getElementById("btnAddLink") || document.getElementById("addLinkBtn");
   const btnRemoveMedia = document.getElementById("btnRemoveMedia") || document.getElementById("removeMediaBtn");
@@ -919,6 +920,44 @@ if (!isHost) {
 
   // ===== Screen Share (Host) =====
   async function startShare() {
+    async function startMobileShare() {
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      alert("مشاركة الشاشة غير مدعومة في هذا الجهاز أو المتصفح");
+      return;
+    }
+
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false
+    }).catch(() => null);
+
+    if (!stream) return;
+
+    hostStream = stream;
+
+    if (mediaVideo) {
+      mediaVideo.srcObject = hostStream;
+      mediaVideo.muted = true;
+      mediaVideo.classList.remove("hidden");
+      await mediaVideo.play().catch(() => {});
+    }
+
+    socket.emit("setMedia", { type: "screen", src: "" });
+
+    const videoTrack = hostStream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.addEventListener("ended", () => {
+        socket.emit("setMedia", { type: "none", src: "" });
+        stopShareLocalOnly();
+      });
+    }
+
+  } catch (err) {
+    console.log("mobile share error", err);
+    alert("ما قدرت أبدأ مشاركة الشاشة من هذا الجهاز");
+  }
+}
     const stream = await navigator.mediaDevices
       .getDisplayMedia({ video: true, audio: false })
       .catch(() => null);
@@ -944,6 +983,7 @@ if (!isHost) {
   }
 
   if (isHost && btnShareScreen) btnShareScreen.onclick = startShare;
+  if (isHost && btnShareScreenMobile) btnShareScreenMobile.onclick = startMobileShare;
 
   // ===== Host: guest asks to join => make offer =====
   socket.on("screenJoin", async ({ guestId }) => {
