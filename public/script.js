@@ -104,8 +104,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const leftWidgetToggleVisible = document.getElementById("leftWidgetToggleVisible");
   const rightWidgetToggleVisible = document.getElementById("rightWidgetToggleVisible");
 
-  let latestTeamWidgets = null;
-
   // ====== لوحة تم ضغط الزر (ضيف) ======
   const buzzOverlay = document.getElementById("buzzOverlay");
   const buzzInfo = document.getElementById("buzzInfo");
@@ -248,7 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // =========================
-  // طلبات (مقدم) - طريقة مضمونة
+  // طلبات (مقدم)
   // =========================
   if (requestsContainer) {
     requestsContainer.addEventListener("click", (e) => {
@@ -305,7 +303,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (gJoinRight) gJoinRight.disabled = locked;
   });
 
-  // اختيار فريق (ضيف)
   if (gJoinLeft) gJoinLeft.onclick = () => socket.emit("chooseTeam", "left");
   if (gJoinRight) gJoinRight.onclick = () => socket.emit("chooseTeam", "right");
 
@@ -364,7 +361,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // =========================
-  // رسم اللاعبين (ضيف + مقدم)
+  // رسم اللاعبين
   // =========================
   socket.on("updatePlayers", (players) => {
     if (myId && players[myId]) myTeam = players[myId].team || null;
@@ -543,7 +540,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (rightLockBadge) rightLockBadge.classList.toggle("hidden", !(state.disabledTeams && state.disabledTeams.right));
   });
 
-  // ضغط زر الضيف
   if (buzzBtn) {
     buzzBtn.addEventListener("click", () => {
       if (myTeam !== "left" && myTeam !== "right") return alert("اختر فريق أولاً 👈");
@@ -559,9 +555,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // =========================
-  // تم ضغط الزر (ضيف + مقدم)
-  // =========================
   socket.on("buzzedInfo", (info) => {
     if (!info || !info.name) return;
 
@@ -586,9 +579,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // =========================
-  // صح/خطأ + Reset (مقدم)
-  // =========================
   if (markCorrectBtn) markCorrectBtn.onclick = () => socket.emit("judgeAnswer", { correct: true });
   if (markWrongBtn) markWrongBtn.onclick = () => socket.emit("judgeAnswer", { correct: false });
 
@@ -619,7 +609,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   socket.on("teamWidgets", (widgets) => {
-    latestTeamWidgets = widgets;
     if (!widgets) return;
 
     renderOneTeamWidget(
@@ -889,7 +878,39 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ===== HOST buttons (التحكم فقط للمقدم) =====
+  // ===== ملف صورة من الجهاز =====
+  const imagePicker = document.createElement("input");
+  imagePicker.type = "file";
+  imagePicker.accept = "image/*";
+  imagePicker.style.display = "none";
+  document.body.appendChild(imagePicker);
+
+  imagePicker.addEventListener("change", () => {
+    const file = imagePicker.files && imagePicker.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result) {
+        alert("ما قدرت أقرأ الصورة");
+        return;
+      }
+
+      socket.emit("setMedia", { type: "image", src: result });
+      imagePicker.value = "";
+    };
+
+    reader.onerror = () => {
+      alert("صار خطأ أثناء قراءة الصورة");
+      imagePicker.value = "";
+    };
+
+    reader.readAsDataURL(file);
+  });
+
+  // ===== HOST buttons =====
   if (isHost && btnAddLink) {
     btnAddLink.onclick = () => {
       const u = prompt("حط رابط الموقع:");
@@ -900,9 +921,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (isHost && btnAddImage) {
     btnAddImage.onclick = () => {
-      const u = prompt("حط رابط الصورة (png/jpg/webp):");
-      if (!u) return;
-      socket.emit("setMedia", { type: "image", src: u.trim() });
+      imagePicker.click();
     };
   }
 
@@ -912,94 +931,30 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // ===== Screen Share / Mobile Camera Fallback (Host) =====
-  async function startCameraFallback() {
+  // ===== Screen Share (Host) =====
+  async function beginShareFlow() {
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("هذا الجهاز لا يدعم مشاركة الشاشة ولا الكاميرا");
+      if (!window.isSecureContext) {
+        alert("مشاركة الشاشة تحتاج رابط آمن HTTPS أو localhost");
         return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        alert("هذا المتصفح أو الجهاز ما يدعم getDisplayMedia");
+        return;
+      }
+
+      stopShareLocalOnly();
+
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
         audio: false
-      }).catch(() => null);
+      });
 
       if (!stream) {
-        alert("ما قدرت أفتح كاميرا الجوال");
+        alert("ما بدأت مشاركة الشاشة");
         return;
       }
-
-      stopShareLocalOnly();
-
-      hostStream = stream;
-      startSnapshotLoop();
-
-      if (mediaVideo) {
-        mediaVideo.srcObject = hostStream;
-        mediaVideo.muted = true;
-        mediaVideo.classList.remove("hidden");
-        await mediaVideo.play().catch(() => {});
-      }
-
-      socket.emit("setMedia", { type: "screen", src: "" });
-
-      const videoTrack = hostStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.addEventListener("ended", () => {
-          socket.emit("setMedia", { type: "none", src: "" });
-          stopShareLocalOnly();
-        });
-      }
-    } catch (err) {
-      console.log("camera fallback error", err);
-      alert("تعذر تشغيل كاميرا الجوال");
-    }
-  }
-
-  async function beginShareFlow(preferMobile = false) {
-    try {
-      if (!navigator.mediaDevices) {
-        alert("هذا الجهاز لا يدعم المشاركة");
-        return;
-      }
-
-      if (!navigator.mediaDevices.getDisplayMedia) {
-        if (preferMobile) {
-          await startCameraFallback();
-          return;
-        }
-
-        alert("مشاركة الشاشة غير مدعومة في هذا الجهاز أو المتصفح");
-        return;
-      }
-
-      const displayOptions = preferMobile
-        ? {
-            video: {
-              frameRate: { ideal: 15, max: 20 }
-            },
-            audio: false
-          }
-        : {
-            video: true,
-            audio: false
-          };
-
-      const stream = await navigator.mediaDevices.getDisplayMedia(displayOptions).catch(() => null);
-
-      if (!stream) {
-        if (preferMobile) {
-          await startCameraFallback();
-        }
-        return;
-      }
-
-      stopShareLocalOnly();
 
       hostStream = stream;
       startSnapshotLoop();
@@ -1023,21 +978,31 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       console.log("share screen error", err);
 
-      if (preferMobile) {
-        await startCameraFallback();
+      if (err && err.name === "NotAllowedError") {
+        alert("تم إلغاء مشاركة الشاشة أو رفض الإذن");
         return;
       }
 
-      alert("ما قدرت أبدأ مشاركة الشاشة من هذا الجهاز");
+      if (err && err.name === "NotFoundError") {
+        alert("ما لقيت شاشة أو نافذة قابلة للمشاركة");
+        return;
+      }
+
+      if (err && err.name === "NotReadableError") {
+        alert("المتصفح ما قدر يبدأ مشاركة الشاشة");
+        return;
+      }
+
+      alert("تعذر تشغيل مشاركة الشاشة");
     }
   }
 
   async function startShare() {
-    await beginShareFlow(false);
+    await beginShareFlow();
   }
 
   async function startMobileShare() {
-    await beginShareFlow(true);
+    await beginShareFlow();
   }
 
   if (isHost && btnShareScreen) {
@@ -1126,7 +1091,7 @@ document.addEventListener("DOMContentLoaded", () => {
     socket.emit("webrtcAnswer", { to: from, sdp: guestPc.localDescription });
   });
 
-  // ===== زر المشاركة للجوال =====
+  // ===== زر مشاركة رابط الصفحة =====
   if (shareBtn) {
     shareBtn.addEventListener("click", async () => {
       const shareData = {
