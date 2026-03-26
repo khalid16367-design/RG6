@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ar">
 
@@ -6,16 +5,13 @@
   <link rel="icon" type="image/png" href="/images/logo.ico">
   <meta charset="UTF-8">
   <title>RG6 Button.host</title>
-
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body class="beige">
 
-  <!-- اللوقو -->
   <div class="logo-box">
     <img src="images/logo.png" class="site-logo">
-
     <div class="logo-title">
       RG6 Button | زر تركي
     </div>
@@ -25,111 +21,70 @@
 
   <h1>صفحة المقدم</h1>
 
-  <!-- طلبات الدخول -->
   <div id="requestsContainer" class="requests-row"></div>
-
 
   <!-- شاشة العرض -->
   <div class="media-screen" id="mediaScreen">
-
-    <!-- عرض رابط -->
     <iframe id="mediaFrame" class="hidden"></iframe>
-
-    <!-- عرض صورة -->
     <img id="mediaImg" class="hidden" alt="media">
-
-    <!-- مشاركة شاشة -->
     <video id="mediaVideo" class="hidden" autoplay playsinline></video>
     <video id="stageVideo" autoplay playsinline muted></video>
 
-    <!-- رسالة افتراضية -->
     <div id="mediaPlaceholder" class="media-placeholder hidden">
       اشغل وقتك بالاستغفار و التسبيح و ذكر الله
     </div>
-
   </div>
-
 
   <!-- خيارات المقدم -->
   <div class="media-actions" id="mediaActions">
-
-    <button id="btnShareScreen" class="media-action">
-      مشاركة شاشة
-    </button>
-
-    <button id="btnShareScreenMobile" class="media-action">
-      مشاركة شاشة جوال
-    </button>
-
-    <button id="btnAddImage" class="media-action">
-      اضافة صورة
-    </button>
-
-    <button id="btnAddLink" class="media-action">
-      اضافة رابط
-    </button>
-
+    <button id="btnShareScreen" class="media-action">مشاركة شاشة</button>
+    <button id="btnShareScreenMobile" class="media-action">مشاركة شاشة جوال</button>
+    <button id="btnAddImage" class="media-action">اضافة صورة</button>
+    <button id="btnAddLink" class="media-action">اضافة رابط</button>
   </div>
 
-
-  <!-- زر إزالة الوسائط -->
   <div class="media-removebar">
-    <button id="btnRemoveMedia" class="media-remove hidden">
-      ازالة
-    </button>
+    <button id="btnRemoveMedia" class="media-remove hidden">ازالة</button>
   </div>
 
-
-  <!-- قفل الفرق -->
-  <button id="lockTeamsBtn">
-    قفل اختيار الفرق
-  </button>
-
+  <button id="lockTeamsBtn">قفل اختيار الفرق</button>
 
   <h3>لاعبين بدون فريق</h3>
   <div id="noTeam"></div>
 
-
-  <!-- الفرق -->
   <div class="teams-wrapper">
 
     <!-- الفريق الأيسر -->
     <div class="team-card" id="leftCard">
-
       <input id="leftTeamName" class="team-title" value="الفريق الأيسر">
 
-      <div class="team-widget-row">
-
-        <div class="team-widget-box" id="leftWidgetBox">
-          <div id="leftWidgetView"></div>
+      <!-- Point فوق -->
+      <div class="team-widget-row stack-widget-row">
+        <div class="team-widget-box" id="leftPointBox">
+          <div id="leftPointView"></div>
         </div>
-
         <div class="team-widget-side">
-          <button id="leftWidgetToggleMode" class="team-widget-side-btn">🔀</button>
-          <button id="leftWidgetToggleVisible" class="team-widget-side-btn">إخفاء/إظهار</button>
+          <button id="leftPointToggleVisible" class="team-widget-side-btn">إخفاء/إظهار Point</button>
         </div>
+      </div>
 
+      <!-- Timer تحت -->
+      <div class="team-widget-row stack-widget-row">
+        <div class="team-widget-box" id="leftTimerBox">
+          <div id="leftTimerView"></div>
+        </div>
+        <div class="team-widget-side">
+          <button id="leftTimerToggleVisible" class="team-widget-side-btn">إخفاء/إظهار Timer</button>
+        </div>
       </div>
 
       <div class="players-box" id="leftTeam"></div>
 
       <div class="team-footer">
-
-        <!-- قفل الفريق -->
         <div class="team-lockbar" id="leftLockBar">
-
-          <button id="leftLockBtn" class="team-lock-btn">
-            قفل 🔒
-          </button>
-
-          <button id="leftOpenBtn" class="team-open-btn">
-            فتح ✅
-          </button>
-
-          <span id="leftLockBadge" class="lock-badge hidden">
-            🔒 مقفل
-          </span>
-
+          <button id="leftLockBtn" class="team-lock-btn">قفل 🔒</button>
+          <button id="leftOpenBtn" class="team-open-btn">فتح ✅</button>
+          <span id="leftLockBadge" class="lock-badge hidden">🔒 مقفل</span>
         </div>
 
         عدد اللاعبين: <span id="leftCount">0</span>
@@ -140,49 +95,40 @@
           <button class="color" data-team="left" data-color="#1e4ed8"></button>
           <button class="color" data-team="left" data-color="#f3e9dc"></button>
         </div>
-
       </div>
-
     </div>
-
 
     <!-- الفريق الأيمن -->
     <div class="team-card" id="rightCard">
-
       <input id="rightTeamName" class="team-title" value="الفريق الأيمن">
 
-      <div class="team-widget-row">
-
-        <div class="team-widget-box" id="rightWidgetBox">
-          <div id="rightWidgetView"></div>
+      <!-- Point فوق -->
+      <div class="team-widget-row stack-widget-row">
+        <div class="team-widget-box" id="rightPointBox">
+          <div id="rightPointView"></div>
         </div>
-
         <div class="team-widget-side">
-          <button id="rightWidgetToggleMode" class="team-widget-side-btn">🔀</button>
-          <button id="rightWidgetToggleVisible" class="team-widget-side-btn">إخفاء/إظهار</button>
+          <button id="rightPointToggleVisible" class="team-widget-side-btn">إخفاء/إظهار Point</button>
         </div>
+      </div>
 
+      <!-- Timer تحت -->
+      <div class="team-widget-row stack-widget-row">
+        <div class="team-widget-box" id="rightTimerBox">
+          <div id="rightTimerView"></div>
+        </div>
+        <div class="team-widget-side">
+          <button id="rightTimerToggleVisible" class="team-widget-side-btn">إخفاء/إظهار Timer</button>
+        </div>
       </div>
 
       <div class="players-box" id="rightTeam"></div>
 
       <div class="team-footer">
-
-        <!-- قفل الفريق -->
         <div class="team-lockbar" id="rightLockBar">
-
-          <button id="rightLockBtn2" class="team-lock-btn">
-            قفل 🔒
-          </button>
-
-          <button id="rightOpenBtn2" class="team-open-btn">
-            فتح ✅
-          </button>
-
-          <span id="rightLockBadge" class="lock-badge hidden">
-            🔒 مقفل
-          </span>
-
+          <button id="rightLockBtn2" class="team-lock-btn">قفل 🔒</button>
+          <button id="rightOpenBtn2" class="team-open-btn">فتح ✅</button>
+          <span id="rightLockBadge" class="lock-badge hidden">🔒 مقفل</span>
         </div>
 
         عدد اللاعبين: <span id="rightCount">0</span>
@@ -193,46 +139,25 @@
           <button class="color" data-team="right" data-color="#1e4ed8"></button>
           <button class="color" data-team="right" data-color="#f3e9dc"></button>
         </div>
-
       </div>
-
     </div>
 
   </div>
 
-
-  <!-- لوحة ضغط الزر للمقدم -->
   <div id="hostBuzzPanel" class="buzz-panel hidden">
-
     <div class="buzz-card">
-
-      <div class="buzz-title">
-        تم ضغط الزر من قبل:
-      </div>
-
-      <div class="buzz-sub" id="hostBuzzInfo">
-        ...
-      </div>
-
-      <div class="buzz-timer" id="hostBuzzTimer">
-        Timer: 0
-      </div>
-
-      <div class="buzz-timeup hidden" id="hostBuzzTimeUp">
-        انتهى الوقت
-      </div>
+      <div class="buzz-title">تم ضغط الزر من قبل:</div>
+      <div class="buzz-sub" id="hostBuzzInfo">...</div>
+      <div class="buzz-timer" id="hostBuzzTimer">Timer: 0</div>
+      <div class="buzz-timeup hidden" id="hostBuzzTimeUp">انتهى الوقت</div>
 
       <div class="judge-row">
         <button id="markCorrectBtn" class="judge ok">صح ✅</button>
         <button id="markWrongBtn" class="judge bad">خطأ ❌</button>
       </div>
-
     </div>
-
   </div>
 
-
-  <!-- أزرار التحكم -->
   <div class="side">
     <button id="lockLeftBtn" class="power-img power-lock" title="قفل على الفريق اليسار"></button>
     <button id="openLeftBtn" class="power-img power-open" title="فتح للفريق اليسار"></button>
@@ -245,12 +170,9 @@
     <button id="lockRightBtn" class="power-img power-lock" title="قفل على الفريق اليمين"></button>
   </div>
 
-
-  <!-- السكربتات -->
   <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
 
 </body>
 </html>
-```
