@@ -952,3 +952,104 @@ body.beige{ background:#f3e8d8; }
   flex-wrap: wrap;
   gap: 6px;
 }
+* {
+  box-sizing: border-box;
+}
+
+.team-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.team-title,
+.team-widget-box,
+.team-footer,
+.joinBtn,
+.players-box,
+.guest-no-team-wrap,
+.noTeamPlayer,
+.player-item {
+  box-sizing: border-box;
+}
+
+.team-widget-box {
+  width: 100%;
+  margin: 0;
+}
+
+.guest-widget-box {
+  width: 100%;
+  margin: 0;
+}
+
+.team-widget-main {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+.team-widget-label {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+}
+
+.stack-widget-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.stack-widget-row .team-widget-side {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 8px;
+}
+
+.players-box {
+  min-height: 140px;
+}
+
+.team-footer {
+  margin-top: auto;
+}
+.custom-color-picker {
+  width: 42px;
+  height: 32px;
+  border: 2px solid #111;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 0;
+}
+/* زر الدارك مود */
+.dark-mode-btn {
+  position: fixed;
+  bottom: 15px;
+  left: 15px;
+  z-index: 9999;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid #111;
+  background: #fff;
+  color: #111;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+body.dark {
+  background: #000 !important;
+}
+
+body.dark .dark-mode-btn {
+  background: #111;
+  color: #fff;
+  border-color: #555;
+}
