@@ -391,41 +391,42 @@ io.on("connection", (socket) => {
      زر اللعبة (Buzz)
   ====================== */
   socket.on("buzz", () => {
-    const p = players[socket.id];
-    if (!p) return;
+  const p = players[socket.id];
+  if (!p) return;
 
-    if (p.buzzLocked) return; // جديد
-    if (p.team !== "left" && p.team !== "right") return;
-    if (buzzState.disabledTeams[p.team]) return;
-    if (buzzState.allowedTeam !== "both" && buzzState.allowedTeam !== p.team) return;
-    if (buzzState.locked) return;
+  if (p.buzzLocked) return;
+  if (p.team !== "left" && p.team !== "right") return;
+  if (buzzState.disabledTeams[p.team]) return;
+  if (buzzState.allowedTeam !== "both" && buzzState.allowedTeam !== p.team) return;
+  if (buzzState.locked) return;
 
-    buzzState.locked = true;
-
-// 🔊 صوت الضغط
+  buzzState.locked = true;
+  // 🔊 صوت الضغط
 io.emit("playBuzzSound");
 
-buzzState.lockedBy = { id: socket.id, name: p.name, team: p.team };
+  buzzState.lockedBy = { id: socket.id, name: p.name, team: p.team };
 
-    const teamName = teamSettings[p.team].name;
-    io.emit("buzzedInfo", { name: p.name, teamKey: p.team, teamName });
-    io.emit("playBuzzSound"); // جديد
+  emitBuzzState();          // مهم يكون بعد lockedBy
+  io.emit("playBuzzSound");
 
-    let timeLeft = 5;
+  const teamName = teamSettings[p.team].name;
+  io.emit("buzzedInfo", { name: p.name, teamKey: p.team, teamName });
+
+  let timeLeft = 5;
+  io.emit("timer", timeLeft);
+
+  if (buzzerTimer) clearInterval(buzzerTimer);
+  buzzerTimer = setInterval(() => {
+    timeLeft--;
     io.emit("timer", timeLeft);
-
-    if (buzzerTimer) clearInterval(buzzerTimer);
-    buzzerTimer = setInterval(() => {
-      timeLeft--;
-      io.emit("timer", timeLeft);
-      if (timeLeft <= 0) {
-        clearInterval(buzzerTimer);
-        buzzerTimer = null;
-        io.emit("timeUp");
-        io.emit("playTimeUpSound"); // جديد
-      }
-    }, 1000);
-  });
+    if (timeLeft <= 0) {
+      clearInterval(buzzerTimer);
+      buzzerTimer = null;
+      io.emit("timeUp");
+      io.emit("playTimeUpSound");
+    }
+  }, 1000);
+});
 
   /* ======================
      حكم المقدم
