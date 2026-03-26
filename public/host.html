@@ -90,11 +90,14 @@
         عدد اللاعبين: <span id="leftCount">0</span>
 
         <div class="colors">
-          <button class="color" data-team="left" data-color="#d8212d"></button>
-          <button class="color" data-team="left" data-color="#18a558"></button>
-          <button class="color" data-team="left" data-color="#1e4ed8"></button>
-          <button class="color" data-team="left" data-color="#f3e9dc"></button>
-        </div>
+  <button class="color" data-team="left" data-color="#d8212d"></button>
+  <button class="color" data-team="left" data-color="#18a558"></button>
+  <button class="color" data-team="left" data-color="#1e4ed8"></button>
+  <button class="color" data-team="left" data-color="#f3e9dc"></button>
+
+  <!-- الجديد -->
+  <input type="color" id="leftCustomColor" class="custom-color-picker" value="#d8212d">
+</div>
       </div>
     </div>
 
@@ -134,11 +137,14 @@
         عدد اللاعبين: <span id="rightCount">0</span>
 
         <div class="colors">
-          <button class="color" data-team="right" data-color="#f59e0b"></button>
-          <button class="color" data-team="right" data-color="#18a558"></button>
-          <button class="color" data-team="right" data-color="#1e4ed8"></button>
-          <button class="color" data-team="right" data-color="#f3e9dc"></button>
-        </div>
+  <button class="color" data-team="right" data-color="#f59e0b"></button>
+  <button class="color" data-team="right" data-color="#18a558"></button>
+  <button class="color" data-team="right" data-color="#1e4ed8"></button>
+  <button class="color" data-team="right" data-color="#f3e9dc"></button>
+
+  <!-- الجديد -->
+  <input type="color" id="rightCustomColor" class="custom-color-picker" value="#f59e0b">
+</div>
       </div>
     </div>
 
@@ -174,5 +180,6 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
 
+  <button id="darkModeBtn" class="dark-mode-btn">🌙</button>
 </body>
 </html>
