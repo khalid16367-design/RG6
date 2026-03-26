@@ -1,5 +1,12 @@
 document.addEventListener("DOMContentLoaded", () => {
   const socket = io();
+
+  socket.on("playBuzzSound", () => {
+  try {
+    buzzSound.currentTime = 0;
+    buzzSound.play().catch(() => {});
+  } catch (e) {}
+});
   console.log("✅ script.js loaded");
 
   // ===== تحديد هل أنا مقدم؟ =====
@@ -30,6 +37,15 @@ timeUpSound.preload = "auto";
 correctSound.preload = "auto";
 wrongSound.preload = "auto";
 
+function stopRoundSounds() {
+  [buzzSound, timeUpSound].forEach((audio) => {
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+    } catch (e) {}
+  });
+}
+
 function stopAllSounds() {
   [buzzSound, timeUpSound, correctSound, wrongSound].forEach((audio) => {
     try {
@@ -38,12 +54,6 @@ function stopAllSounds() {
     } catch (e) {}
   });
 }
-socket.on("playBuzzSound", () => {
-  try {
-    buzzSound.currentTime = 0;
-    buzzSound.play().catch(() => {});
-  } catch (e) {}
-});
 
 socket.on("playTimeUpSound", () => {
   try {
@@ -67,7 +77,7 @@ socket.on("playWrongSound", () => {
 });
 
 socket.on("stopAllSounds", () => {
-  stopAllSounds();
+  stopRoundSounds();
 });
   // ====== معرفي ======
   let myId = null;
@@ -417,6 +427,25 @@ socket.on("stopAllSounds", () => {
   if (rightTeamNameInput) rightTeamNameInput.addEventListener("input", sendTeamSettingsToServer);
 
   document.querySelectorAll(".color").forEach((btn) => {
+    // ===== لون مخصص =====
+const leftCustomColor = document.getElementById("leftCustomColor");
+const rightCustomColor = document.getElementById("rightCustomColor");
+
+if (leftCustomColor) {
+  leftCustomColor.addEventListener("input", () => {
+    if (!currentTeamSettings) return;
+    currentTeamSettings.left.color = leftCustomColor.value;
+    sendTeamSettingsToServer();
+  });
+}
+
+if (rightCustomColor) {
+  rightCustomColor.addEventListener("input", () => {
+    if (!currentTeamSettings) return;
+    currentTeamSettings.right.color = rightCustomColor.value;
+    sendTeamSettingsToServer();
+  });
+}
     const c = btn.dataset.color;
     if (c) btn.style.background = c;
 
@@ -756,7 +785,7 @@ socket.on("stopAllSounds", () => {
   });
 
   socket.on("reset", () => {
-  stopAllSounds();
+  stopRoundSounds();
 
   if (statusText) statusText.textContent = "بانتظار الضغط...";
   if (timerText) timerText.textContent = "Timer: 0";
@@ -1217,4 +1246,34 @@ socket.on("stopAllSounds", () => {
       }
     });
   }
+  // ===== Dark Mode =====
+const darkBtn = document.getElementById("darkModeBtn");
+
+function setDarkMode(enabled) {
+  document.body.classList.toggle("dark", enabled);
+  try {
+    localStorage.setItem("darkMode", enabled ? "1" : "0");
+  } catch (e) {}
+  if (darkBtn) {
+    darkBtn.textContent = enabled ? "☀️" : "🌙";
+  }
+}
+
+try {
+  if (localStorage.getItem("darkMode") === "1") {
+    setDarkMode(true);
+  } else {
+    setDarkMode(false);
+  }
+} catch (e) {
+  setDarkMode(false);
+}
+
+if (darkBtn) {
+  darkBtn.addEventListener("click", () => {
+    const isDark = document.body.classList.contains("dark");
+    setDarkMode(!isDark);
+  });
+}
+
 });
