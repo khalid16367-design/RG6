@@ -142,6 +142,7 @@ function resetBuzz(full = false) {
     buzzerTimer = null;
   }
 
+  io.emit("stopAllSounds");
   io.emit("timer", 0);
   io.emit("reset");
   emitBuzzState();
@@ -432,32 +433,34 @@ io.on("connection", (socket) => {
     const { id, team } = buzzState.lockedBy;
 
     if (correct === true) {
-      if (players[id]) players[id].correctCount = (players[id].correctCount || 0) + 1;
-      io.emit("updatePlayers", players);
+  if (players[id]) players[id].correctCount = (players[id].correctCount || 0) + 1;
+  io.emit("updatePlayers", players);
 
-      resetBuzz(true);
-      io.emit("judgeResult", { result: "correct" });
-      return;
-    }
+  io.emit("playCorrectSound");
+  resetBuzz(true);
+  io.emit("judgeResult", { result: "correct" });
+  return;
+}
 
-    if (correct === false) {
-      buzzState.locked = false;
-      buzzState.disabledTeams[team] = true;
-      buzzState.lockedBy = null;
-      buzzState.allowedTeam = team === "left" ? "right" : "left";
+if (correct === false) {
+  buzzState.locked = false;
+  buzzState.disabledTeams[team] = true;
+  buzzState.lockedBy = null;
+  buzzState.allowedTeam = team === "left" ? "right" : "left";
 
-      if (buzzerTimer) {
-        clearInterval(buzzerTimer);
-        buzzerTimer = null;
-      }
+  if (buzzerTimer) {
+    clearInterval(buzzerTimer);
+    buzzerTimer = null;
+  }
 
-      io.emit("timer", 0);
-      io.emit("reset");
-      emitBuzzState();
+  io.emit("playWrongSound");
+  io.emit("timer", 0);
+  io.emit("reset");
+  emitBuzzState();
 
-      io.emit("judgeResult", { result: "wrong", lockedTeam: team });
-      return;
-    }
+  io.emit("judgeResult", { result: "wrong", lockedTeam: team });
+  return;
+}
   });
 
   /* ======================
@@ -493,18 +496,19 @@ io.on("connection", (socket) => {
   });
 
   socket.on("reset", () => {
-    buzzState.locked = false;
-    buzzState.lockedBy = null;
+  buzzState.locked = false;
+  buzzState.lockedBy = null;
 
-    if (buzzerTimer) {
-      clearInterval(buzzerTimer);
-      buzzerTimer = null;
-    }
+  if (buzzerTimer) {
+    clearInterval(buzzerTimer);
+    buzzerTimer = null;
+  }
 
-    io.emit("timer", 0);
-    io.emit("reset");
-    emitBuzzState();
-  });
+  io.emit("stopAllSounds");
+  io.emit("timer", 0);
+  io.emit("reset");
+  emitBuzzState();
+});
 
   socket.on("disconnect", () => {
     const wasHost = socket.id === hostSocketId;
