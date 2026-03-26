@@ -401,8 +401,11 @@ io.on("connection", (socket) => {
     if (buzzState.locked) return;
 
     buzzState.locked = true;
-    buzzState.lockedBy = { id: socket.id, name: p.name, team: p.team };
-    emitBuzzState();
+
+// 🔊 صوت الضغط
+io.emit("playBuzzSound");
+
+buzzState.lockedBy = { id: socket.id, name: p.name, team: p.team };
 
     const teamName = teamSettings[p.team].name;
     io.emit("buzzedInfo", { name: p.name, teamKey: p.team, teamName });
@@ -437,12 +440,18 @@ io.on("connection", (socket) => {
   io.emit("updatePlayers", players);
 
   io.emit("playCorrectSound");
-  resetBuzz(true);
-  io.emit("judgeResult", { result: "correct" });
+
+  setTimeout(() => {
+    resetBuzz(true);
+    io.emit("judgeResult", { result: "correct" });
+  }, 900);
+
   return;
 }
 
 if (correct === false) {
+  io.emit("playWrongSound");
+
   buzzState.locked = false;
   buzzState.disabledTeams[team] = true;
   buzzState.lockedBy = null;
@@ -453,12 +462,13 @@ if (correct === false) {
     buzzerTimer = null;
   }
 
-  io.emit("playWrongSound");
-  io.emit("timer", 0);
-  io.emit("reset");
-  emitBuzzState();
+  setTimeout(() => {
+    io.emit("timer", 0);
+    io.emit("reset");
+    emitBuzzState();
+    io.emit("judgeResult", { result: "wrong", lockedTeam: team });
+  }, 900);
 
-  io.emit("judgeResult", { result: "wrong", lockedTeam: team });
   return;
 }
   });
