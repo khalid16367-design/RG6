@@ -32,10 +32,23 @@ let hostSocketId = null;
 let mediaState = { type: "none", src: "" };
 let latestSnapshot = "";
 
-// ===== Widgets: Timer / Point لكل فريق =====
+// ===== Widgets الجديدة =====
+// pointVisible + timerVisible بدل mode
 let teamWidgets = {
-  left:  { visible: true, mode: "timer", seconds: 15, running: false, points: 0 },
-  right: { visible: true, mode: "timer", seconds: 15, running: false, points: 0 },
+  left: {
+    pointVisible: true,
+    timerVisible: true,
+    seconds: 15,
+    running: false,
+    points: 0,
+  },
+  right: {
+    pointVisible: true,
+    timerVisible: true,
+    seconds: 15,
+    running: false,
+    points: 0,
+  },
 };
 
 let teamWidgetIntervals = {
@@ -139,12 +152,10 @@ io.on("connection", (socket) => {
 
   socket.on("screenSnapshot", (dataUrl) => {
     latestSnapshot = String(dataUrl || "");
-    console.log("🖼️ screenSnapshot from:", socket.id, "size:", latestSnapshot.length);
     socket.broadcast.emit("screenSnapshot", latestSnapshot);
   });
 
   const iceServers = buildIceServers();
-  console.log("🧊 ICE for client:", socket.id, JSON.stringify(iceServers, null, 2));
   socket.emit("iceServers", iceServers);
 
   socket.emit("mediaState", mediaState);
@@ -154,7 +165,6 @@ io.on("connection", (socket) => {
 
   socket.on("registerHost", () => {
     hostSocketId = socket.id;
-    console.log("👑 Host registered:", hostSocketId);
     socket.emit("mediaState", mediaState);
 
     if (mediaState.type === "screen" && latestSnapshot) {
@@ -172,8 +182,6 @@ io.on("connection", (socket) => {
       latestSnapshot = "";
     }
 
-    console.log("📺 setMedia from host:", socket.id, mediaState);
-
     io.emit("mediaState", mediaState);
 
     if (mediaState.type === "screen" && latestSnapshot) {
@@ -183,26 +191,22 @@ io.on("connection", (socket) => {
 
   socket.on("screenJoin", () => {
     if (!hostSocketId) return;
-    console.log("🖥️ screenJoin from guest:", socket.id, "=> host:", hostSocketId);
     io.to(hostSocketId).emit("screenJoin", { guestId: socket.id });
   });
 
   socket.on("webrtcOffer", ({ to, sdp }) => {
     if (socket.id !== hostSocketId) return;
     if (!to || !sdp) return;
-    console.log("📨 webrtcOffer:", { from: socket.id, to });
     io.to(to).emit("webrtcOffer", { from: socket.id, sdp });
   });
 
   socket.on("webrtcAnswer", ({ to, sdp }) => {
     if (!to || !sdp) return;
-    console.log("📩 webrtcAnswer:", { from: socket.id, to });
     io.to(to).emit("webrtcAnswer", { from: socket.id, sdp });
   });
 
   socket.on("webrtcIce", ({ to, ice }) => {
     if (!to || !ice) return;
-    console.log("🧊 webrtcIce:", { from: socket.id, to });
     io.to(to).emit("webrtcIce", { from: socket.id, ice });
   });
 
@@ -214,25 +218,22 @@ io.on("connection", (socket) => {
   socket.emit("teamWidgets", teamWidgets);
 
   /* ======================
-     Timer / Point Widgets
+     Widgets الجديدة
   ====================== */
-  socket.on("toggleTeamWidgetMode", (team) => {
+  socket.on("toggleTeamPointVisible", (team) => {
     if (team !== "left" && team !== "right") return;
-
-    teamWidgets[team].mode = teamWidgets[team].mode === "timer" ? "point" : "timer";
+    teamWidgets[team].pointVisible = !teamWidgets[team].pointVisible;
     emitTeamWidgets();
   });
 
-  socket.on("toggleTeamWidgetVisible", (team) => {
+  socket.on("toggleTeamTimerVisible", (team) => {
     if (team !== "left" && team !== "right") return;
-
-    teamWidgets[team].visible = !teamWidgets[team].visible;
+    teamWidgets[team].timerVisible = !teamWidgets[team].timerVisible;
     emitTeamWidgets();
   });
 
   socket.on("setTeamWidgetPoints", ({ team, value }) => {
     if (team !== "left" && team !== "right") return;
-
     const num = Number(value);
     teamWidgets[team].points = Number.isFinite(num) ? num : 0;
     emitTeamWidgets();
@@ -255,7 +256,7 @@ io.on("connection", (socket) => {
   });
 
   /* ======================
-     تحديث اسم/لون الفرق من المقدم
+     تحديث اسم/لون الفرق
   ====================== */
   socket.on("setTeamSettings", (newSettings) => {
     if (!newSettings || !newSettings.left || !newSettings.right) return;
@@ -291,6 +292,7 @@ io.on("connection", (socket) => {
       name: clean,
       team: null,
       correctCount: 0,
+      buzzLocked: false, // جديد
     };
 
     io.emit("updateRequests", joinRequests);
@@ -324,7 +326,7 @@ io.on("connection", (socket) => {
   });
 
   /* ======================
-     اختيار فريق (ضيف)
+     اختيار فريق
   ====================== */
   socket.on("chooseTeam", (team) => {
     if (teamChoiceLocked) return;
@@ -364,8 +366,16 @@ io.on("connection", (socket) => {
     io.emit("updatePlayers", players);
   });
 
+  // جديد: قفل الزر على لاعب
+  socket.on("togglePlayerBuzzLock", (id) => {
+    if (!players[id]) return;
+    players[id].buzzLocked = !players[id].buzzLocked;
+    io.emit("updatePlayers", players);
+    emitBuzzState();
+  });
+
   /* ======================
-     نقاط (➕➖)
+     نقاط
   ====================== */
   socket.on("adjustScore", ({ id, delta }) => {
     if (!players[id]) return;
@@ -383,6 +393,7 @@ io.on("connection", (socket) => {
     const p = players[socket.id];
     if (!p) return;
 
+    if (p.buzzLocked) return; // جديد
     if (p.team !== "left" && p.team !== "right") return;
     if (buzzState.disabledTeams[p.team]) return;
     if (buzzState.allowedTeam !== "both" && buzzState.allowedTeam !== p.team) return;
@@ -394,6 +405,7 @@ io.on("connection", (socket) => {
 
     const teamName = teamSettings[p.team].name;
     io.emit("buzzedInfo", { name: p.name, teamKey: p.team, teamName });
+    io.emit("playBuzzSound"); // جديد
 
     let timeLeft = 5;
     io.emit("timer", timeLeft);
@@ -406,12 +418,13 @@ io.on("connection", (socket) => {
         clearInterval(buzzerTimer);
         buzzerTimer = null;
         io.emit("timeUp");
+        io.emit("playTimeUpSound"); // جديد
       }
     }, 1000);
   });
 
   /* ======================
-     حكم المقدم: صح/خطأ
+     حكم المقدم
   ====================== */
   socket.on("judgeAnswer", ({ correct }) => {
     if (!buzzState.locked || !buzzState.lockedBy) return;
@@ -437,6 +450,7 @@ io.on("connection", (socket) => {
         clearInterval(buzzerTimer);
         buzzerTimer = null;
       }
+
       io.emit("timer", 0);
       io.emit("reset");
       emitBuzzState();
@@ -486,6 +500,7 @@ io.on("connection", (socket) => {
       clearInterval(buzzerTimer);
       buzzerTimer = null;
     }
+
     io.emit("timer", 0);
     io.emit("reset");
     emitBuzzState();
@@ -515,8 +530,6 @@ io.on("connection", (socket) => {
       stopTeamWidgetTimer("left");
       stopTeamWidgetTimer("right");
       emitTeamWidgets();
-
-      console.log("👑 Host left, media cleared");
     }
 
     console.log("🔴 disconnected:", socket.id);
