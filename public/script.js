@@ -21,25 +21,54 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ===== الأصوات =====
   const buzzSound = new Audio("/assets/buzz_sound.mp3");
-  const timeUpSound = new Audio("/assets/timeup_sound.mp3");
+const timeUpSound = new Audio("/assets/timeup_sound.mp3");
+const correctSound = new Audio("/assets/correct_sound.mp3");
+const wrongSound = new Audio("/assets/wrong_sound.mp3");
 
-  buzzSound.preload = "auto";
-  timeUpSound.preload = "auto";
+buzzSound.preload = "auto";
+timeUpSound.preload = "auto";
+correctSound.preload = "auto";
+wrongSound.preload = "auto";
 
-  socket.on("playBuzzSound", () => {
+function stopAllSounds() {
+  [buzzSound, timeUpSound, correctSound, wrongSound].forEach((audio) => {
     try {
-      buzzSound.currentTime = 0;
-      buzzSound.play().catch(() => {});
+      audio.pause();
+      audio.currentTime = 0;
     } catch (e) {}
   });
+}
+socket.on("playBuzzSound", () => {
+  try {
+    buzzSound.currentTime = 0;
+    buzzSound.play().catch(() => {});
+  } catch (e) {}
+});
 
-  socket.on("playTimeUpSound", () => {
-    try {
-      timeUpSound.currentTime = 0;
-      timeUpSound.play().catch(() => {});
-    } catch (e) {}
-  });
+socket.on("playTimeUpSound", () => {
+  try {
+    timeUpSound.currentTime = 0;
+    timeUpSound.play().catch(() => {});
+  } catch (e) {}
+});
 
+socket.on("playCorrectSound", () => {
+  try {
+    correctSound.currentTime = 0;
+    correctSound.play().catch(() => {});
+  } catch (e) {}
+});
+
+socket.on("playWrongSound", () => {
+  try {
+    wrongSound.currentTime = 0;
+    wrongSound.play().catch(() => {});
+  } catch (e) {}
+});
+
+socket.on("stopAllSounds", () => {
+  stopAllSounds();
+});
   // ====== معرفي ======
   let myId = null;
   socket.on("connect", () => {
@@ -727,17 +756,19 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   socket.on("reset", () => {
-    if (statusText) statusText.textContent = "بانتظار الضغط...";
-    if (timerText) timerText.textContent = "Timer: 0";
+  stopAllSounds();
 
-    if (buzzOverlay) buzzOverlay.classList.add("hidden");
-    if (buzzInfo) buzzInfo.innerHTML = "";
+  if (statusText) statusText.textContent = "بانتظار الضغط...";
+  if (timerText) timerText.textContent = "Timer: 0";
 
-    if (hostBuzzPanel) hostBuzzPanel.classList.add("hidden");
-    if (hostBuzzInfo) hostBuzzInfo.innerHTML = "";
-    if (hostBuzzTimer) hostBuzzTimer.textContent = "Timer: 0";
-    if (hostBuzzTimeUp) hostBuzzTimeUp.classList.add("hidden");
-  });
+  if (buzzOverlay) buzzOverlay.classList.add("hidden");
+  if (buzzInfo) buzzInfo.innerHTML = "";
+
+  if (hostBuzzPanel) hostBuzzPanel.classList.add("hidden");
+  if (hostBuzzInfo) hostBuzzInfo.innerHTML = "";
+  if (hostBuzzTimer) hostBuzzTimer.textContent = "Timer: 0";
+  if (hostBuzzTimeUp) hostBuzzTimeUp.classList.add("hidden");
+});
 
   // =====================================================
   // =============== MEDIA SCREEN (Host + Guest) ==========
