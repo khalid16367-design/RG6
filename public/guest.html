@@ -10,7 +10,6 @@
 
   <div class="logo-box">
     <img src="images/logo.png" class="site-logo">
-
     <div class="logo-title">
       RG6 Button | زر تركي
     </div>
@@ -36,26 +35,19 @@
   <div id="gameScreen" class="hidden">
     <hr>
 
-    <!-- ✅ شاشة العرض الكبيرة -->
+    <!-- شاشة العرض -->
     <div class="media-screen" id="mediaScreen">
-
-      <!-- للروابط -->
       <iframe id="mediaFrame" class="hidden"></iframe>
-
-      <!-- للصور -->
       <img id="mediaImg" class="hidden" alt="media" />
-
-      <!-- لمشاركة الشاشة -->
       <video id="mediaVideo" class="hidden" autoplay playsinline></video>
       <video id="stageVideo" autoplay playsinline muted></video>
 
-      <!-- رسالة افتراضية (تظهر للضيف فقط لما ما فيه شيء) -->
       <div id="mediaPlaceholder" class="media-placeholder hidden">
         اشغل وقتك بالاستغفار و التسبيح و ذكر الله
       </div>
     </div>
 
-    <!-- ✅ شاشة تم ضغط الزر (داخل الصفحة + بالنص) -->
+    <!-- لوحة تم ضغط الزر -->
     <div id="buzzOverlay" class="buzz-panel hidden">
       <div class="buzz-card">
         <div class="buzz-title">تم ضغط الزر من قبل:</div>
@@ -76,31 +68,53 @@
       <div id="gNoTeamPlayers" class="guest-no-team-box"></div>
     </div>
 
-    <!-- لوحة الفرق للضيف -->
+    <!-- الفرق -->
     <div class="teams-wrapper guest-teams">
+
       <div class="team-card" id="gLeftCard">
         <div class="team-title guest-title" id="gLeftName">الفريق الأيسر</div>
-        <div class="team-widget-box guest-widget-box" id="gLeftWidgetBox">
-          <div id="gLeftWidgetView"></div>
+
+        <!-- Point فوق -->
+        <div class="team-widget-box guest-widget-box" id="gLeftPointBox">
+          <div id="gLeftPointView"></div>
         </div>
+
+        <!-- Timer تحت -->
+        <div class="team-widget-box guest-widget-box" id="gLeftTimerBox">
+          <div id="gLeftTimerView"></div>
+        </div>
+
         <div class="players-box" id="gLeftPlayers"></div>
+
         <div class="team-footer">
           عدد اللاعبين: <span id="gLeftCount">0</span>
         </div>
+
         <button class="joinBtn" id="gJoinLeft">انضم هنا</button>
       </div>
 
       <div class="team-card" id="gRightCard">
         <div class="team-title guest-title" id="gRightName">الفريق الأيمن</div>
-        <div class="team-widget-box guest-widget-box" id="gRightWidgetBox">
-          <div id="gRightWidgetView"></div>
+
+        <!-- Point فوق -->
+        <div class="team-widget-box guest-widget-box" id="gRightPointBox">
+          <div id="gRightPointView"></div>
         </div>
+
+        <!-- Timer تحت -->
+        <div class="team-widget-box guest-widget-box" id="gRightTimerBox">
+          <div id="gRightTimerView"></div>
+        </div>
+
         <div class="players-box" id="gRightPlayers"></div>
+
         <div class="team-footer">
           عدد اللاعبين: <span id="gRightCount">0</span>
         </div>
+
         <button class="joinBtn" id="gJoinRight">انضم هنا</button>
       </div>
+
     </div>
   </div>
 
