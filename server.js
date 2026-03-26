@@ -440,6 +440,7 @@ io.emit("playBuzzSound");
   if (players[id]) players[id].correctCount = (players[id].correctCount || 0) + 1;
   io.emit("updatePlayers", players);
 
+  io.emit("stopAllSounds");   // 🔥 يوقف timeup فورًا
   io.emit("playCorrectSound");
 
   setTimeout(() => {
@@ -451,6 +452,7 @@ io.emit("playBuzzSound");
 }
 
 if (correct === false) {
+  io.emit("stopAllSounds");   // 🔥 يوقف timeup فورًا
   io.emit("playWrongSound");
 
   buzzState.locked = false;
