@@ -928,3 +928,27 @@ body.beige{ background:#f3e8d8; }
   font-weight:900;
   cursor:pointer;
 }
+
+
+.stack-widget-row{
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stack-widget-row .team-widget-side{
+  flex-direction: row;
+  justify-content: center;
+}
+
+.team-widget-box{
+  width: 100%;
+}
+
+.pcontrols,
+.noTeamBtns{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
