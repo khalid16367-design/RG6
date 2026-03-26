@@ -19,6 +19,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // ===== الأصوات =====
+  const buzzSound = new Audio("/assets/buzz_sound.mp3");
+  const timeUpSound = new Audio("/assets/timeup_sound.mp3");
+
+  buzzSound.preload = "auto";
+  timeUpSound.preload = "auto";
+
+  socket.on("playBuzzSound", () => {
+    try {
+      buzzSound.currentTime = 0;
+      buzzSound.play().catch(() => {});
+    } catch (e) {}
+  });
+
+  socket.on("playTimeUpSound", () => {
+    try {
+      timeUpSound.currentTime = 0;
+      timeUpSound.play().catch(() => {});
+    } catch (e) {}
+  });
+
   // ====== معرفي ======
   let myId = null;
   socket.on("connect", () => {
@@ -44,7 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ===== منع الخروج بالرجوع (مهم للسوني) =====
+  // ===== منع الخروج بالرجوع =====
   if (!isHost) {
     history.pushState(null, "", location.href);
 
@@ -88,21 +109,31 @@ document.addEventListener("DOMContentLoaded", () => {
   const leftCount = document.getElementById("leftCount");
   const rightCount = document.getElementById("rightCount");
 
-  // ====== Team Widgets (Timer / Point) ======
-  const leftWidgetBox = document.getElementById("leftWidgetBox");
-  const rightWidgetBox = document.getElementById("rightWidgetBox");
-  const leftWidgetView = document.getElementById("leftWidgetView");
-  const rightWidgetView = document.getElementById("rightWidgetView");
+  // ====== Widgets الجديدة ======
+  const leftPointBox = document.getElementById("leftPointBox");
+  const rightPointBox = document.getElementById("rightPointBox");
+  const leftPointView = document.getElementById("leftPointView");
+  const rightPointView = document.getElementById("rightPointView");
 
-  const gLeftWidgetBox = document.getElementById("gLeftWidgetBox");
-  const gRightWidgetBox = document.getElementById("gRightWidgetBox");
-  const gLeftWidgetView = document.getElementById("gLeftWidgetView");
-  const gRightWidgetView = document.getElementById("gRightWidgetView");
+  const leftTimerBox = document.getElementById("leftTimerBox");
+  const rightTimerBox = document.getElementById("rightTimerBox");
+  const leftTimerView = document.getElementById("leftTimerView");
+  const rightTimerView = document.getElementById("rightTimerView");
 
-  const leftWidgetToggleMode = document.getElementById("leftWidgetToggleMode");
-  const rightWidgetToggleMode = document.getElementById("rightWidgetToggleMode");
-  const leftWidgetToggleVisible = document.getElementById("leftWidgetToggleVisible");
-  const rightWidgetToggleVisible = document.getElementById("rightWidgetToggleVisible");
+  const gLeftPointBox = document.getElementById("gLeftPointBox");
+  const gRightPointBox = document.getElementById("gRightPointBox");
+  const gLeftPointView = document.getElementById("gLeftPointView");
+  const gRightPointView = document.getElementById("gRightPointView");
+
+  const gLeftTimerBox = document.getElementById("gLeftTimerBox");
+  const gRightTimerBox = document.getElementById("gRightTimerBox");
+  const gLeftTimerView = document.getElementById("gLeftTimerView");
+  const gRightTimerView = document.getElementById("gRightTimerView");
+
+  const leftPointToggleVisible = document.getElementById("leftPointToggleVisible");
+  const rightPointToggleVisible = document.getElementById("rightPointToggleVisible");
+  const leftTimerToggleVisible = document.getElementById("leftTimerToggleVisible");
+  const rightTimerToggleVisible = document.getElementById("rightTimerToggleVisible");
 
   // ====== لوحة تم ضغط الزر (ضيف) ======
   const buzzOverlay = document.getElementById("buzzOverlay");
@@ -118,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const markCorrectBtn = document.getElementById("markCorrectBtn");
   const markWrongBtn = document.getElementById("markWrongBtn");
 
-  // ====== قفل/فتح داخل الكروت (المقدم) ======
+  // ====== قفل/فتح داخل الكروت ======
   const leftLockBtn = document.getElementById("leftLockBtn");
   const leftOpenBtn = document.getElementById("leftOpenBtn");
   const rightLockBtn2 = document.getElementById("rightLockBtn2");
@@ -126,7 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const leftLockBadge = document.getElementById("leftLockBadge");
   const rightLockBadge = document.getElementById("rightLockBadge");
 
-  // ====== تحكم صور (تحت) ======
+  // ====== تحكم صور ======
   const lockLeftBtn = document.getElementById("lockLeftBtn");
   const openLeftBtn = document.getElementById("openLeftBtn");
   const lockRightBtn = document.getElementById("lockRightBtn");
@@ -141,6 +172,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentTeamSettings = null;
   let lastBuzzState = null;
   let myTeam = null;
+  let allPlayers = {};
 
   function formatWidgetTime(sec) {
     return String(sec).padStart(2, "0");
@@ -150,6 +182,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const startBtn = document.getElementById(`${team}WidgetStartBtn`);
     const resetBtnLocal = document.getElementById(`${team}WidgetResetBtn`);
     const pointInput = document.getElementById(`${team}WidgetPointInput`);
+    const secondsInput = document.getElementById(`${team}WidgetSecondsInput`);
+    const applySecondsBtn = document.getElementById(`${team}WidgetApplySecondsBtn`);
 
     if (startBtn) {
       startBtn.onclick = () => {
@@ -170,48 +204,58 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       };
     }
+
+    if (applySecondsBtn && secondsInput) {
+      applySecondsBtn.onclick = () => {
+        socket.emit("setTeamWidgetSeconds", {
+          team,
+          value: secondsInput.value
+        });
+      };
+    }
   }
 
-  function renderOneTeamWidget(team, state, hostBox, hostView, guestBox, guestView) {
+  function renderTeamWidgets(team, state, refs) {
     if (!state) return;
 
-    if (hostBox) hostBox.classList.toggle("hidden", !state.visible);
-    if (guestBox) guestBox.classList.toggle("hidden", !state.visible);
+    if (refs.hostPointBox) refs.hostPointBox.classList.toggle("hidden", !state.pointVisible);
+    if (refs.hostTimerBox) refs.hostTimerBox.classList.toggle("hidden", !state.timerVisible);
+    if (refs.guestPointBox) refs.guestPointBox.classList.toggle("hidden", !state.pointVisible);
+    if (refs.guestTimerBox) refs.guestTimerBox.classList.toggle("hidden", !state.timerVisible);
 
-    let hostHtml = "";
-    let guestHtml = "";
+    const pointHostHtml = `
+      <div class="team-widget-main">
+        <span class="team-widget-label">Point :</span>
+        <input id="${team}WidgetPointInput" class="team-widget-input" type="number" value="${state.points}">
+      </div>
+    `;
 
-    if (state.mode === "timer") {
-      hostHtml = `
-        <div class="team-widget-main">
-          <span class="team-widget-label">Timer : ${formatWidgetTime(state.seconds)}</span>
-          <button class="team-widget-btn" id="${team}WidgetStartBtn">${state.running ? "إيقاف" : "تشغيل"}</button>
-          <button class="team-widget-btn" id="${team}WidgetResetBtn">Reset</button>
-        </div>
-      `;
+    const pointGuestHtml = `
+      <div class="team-widget-main">
+        <span class="team-widget-label">Point : ${state.points}</span>
+      </div>
+    `;
 
-      guestHtml = `
-        <div class="team-widget-main">
-          <span class="team-widget-label">Timer : ${formatWidgetTime(state.seconds)}</span>
-        </div>
-      `;
-    } else {
-      hostHtml = `
-        <div class="team-widget-main">
-          <span class="team-widget-label">Point :</span>
-          <input id="${team}WidgetPointInput" class="team-widget-input" type="number" value="${state.points}">
-        </div>
-      `;
+    const timerHostHtml = `
+      <div class="team-widget-main">
+        <span class="team-widget-label">Timer : ${formatWidgetTime(state.seconds)}</span>
+        <input id="${team}WidgetSecondsInput" class="team-widget-input" type="number" min="1" value="${state.seconds}">
+        <button class="team-widget-btn" id="${team}WidgetApplySecondsBtn">تعيين</button>
+        <button class="team-widget-btn" id="${team}WidgetStartBtn">${state.running ? "إيقاف" : "تشغيل"}</button>
+        <button class="team-widget-btn" id="${team}WidgetResetBtn">Reset</button>
+      </div>
+    `;
 
-      guestHtml = `
-        <div class="team-widget-main">
-          <span class="team-widget-label">Point : ${state.points}</span>
-        </div>
-      `;
-    }
+    const timerGuestHtml = `
+      <div class="team-widget-main">
+        <span class="team-widget-label">Timer : ${formatWidgetTime(state.seconds)}</span>
+      </div>
+    `;
 
-    if (hostView) hostView.innerHTML = hostHtml;
-    if (guestView) guestView.innerHTML = guestHtml;
+    if (refs.hostPointView) refs.hostPointView.innerHTML = pointHostHtml;
+    if (refs.guestPointView) refs.guestPointView.innerHTML = pointGuestHtml;
+    if (refs.hostTimerView) refs.hostTimerView.innerHTML = timerHostHtml;
+    if (refs.guestTimerView) refs.guestTimerView.innerHTML = timerGuestHtml;
 
     if (isHost) {
       bindTeamWidgetHostControls(team, state);
@@ -219,7 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================
-  // طلب دخول (ضيف)
+  // طلب دخول
   // =========================
   if (sendRequestBtn) {
     sendRequestBtn.addEventListener("click", () => {
@@ -246,7 +290,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // =========================
-  // طلبات (مقدم)
+  // طلبات المقدم
   // =========================
   if (requestsContainer) {
     requestsContainer.addEventListener("click", (e) => {
@@ -307,7 +351,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (gJoinRight) gJoinRight.onclick = () => socket.emit("chooseTeam", "right");
 
   // =========================
-  // إعدادات الفرق (اسم/لون)
+  // إعدادات الفرق
   // =========================
   function sendTeamSettingsToServer() {
     if (!currentTeamSettings) return;
@@ -364,6 +408,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // رسم اللاعبين
   // =========================
   socket.on("updatePlayers", (players) => {
+    allPlayers = players;
+
     if (myId && players[myId]) myTeam = players[myId].team || null;
     else myTeam = null;
 
@@ -376,13 +422,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     Object.values(players).forEach((p) => {
       const score = p.correctCount || 0;
+      const lockText = p.buzzLocked ? " | 🔒" : "";
 
       if (p.team === "left") {
         l++;
         if (gLeftPlayers) {
           const row = document.createElement("div");
           row.className = "player-item";
-          row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
+          row.innerHTML = `<span>${p.name}${lockText}</span><span>✅${score}</span>`;
           gLeftPlayers.appendChild(row);
         }
         return;
@@ -393,7 +440,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (gRightPlayers) {
           const row = document.createElement("div");
           row.className = "player-item";
-          row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
+          row.innerHTML = `<span>${p.name}${lockText}</span><span>✅${score}</span>`;
           gRightPlayers.appendChild(row);
         }
         return;
@@ -402,7 +449,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (gNoTeamPlayers) {
         const row = document.createElement("div");
         row.className = "player-item";
-        row.innerHTML = `<span>${p.name}</span><span>✅${score}</span>`;
+        row.innerHTML = `<span>${p.name}${lockText}</span><span>✅${score}</span>`;
         gNoTeamPlayers.appendChild(row);
       }
     });
@@ -427,7 +474,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const info = document.createElement("span");
           info.className = "pinfo";
-          info.textContent = `${p.name} | ✅${score}`;
+          info.textContent = `${p.name} | ✅${score}${p.buzzLocked ? " | 🔒" : ""}`;
 
           const controls = document.createElement("div");
           controls.className = "pcontrols";
@@ -448,7 +495,11 @@ document.addEventListener("DOMContentLoaded", () => {
           swapBtn.textContent = "🔀";
           swapBtn.onclick = () => socket.emit("swapTeam", id);
 
-          controls.append(minus, plus, removeBtn, swapBtn);
+          const buzzLockBtn = document.createElement("button");
+          buzzLockBtn.textContent = p.buzzLocked ? "فتح الزر 🔓" : "قفل الزر 🔒";
+          buzzLockBtn.onclick = () => socket.emit("togglePlayerBuzzLock", id);
+
+          controls.append(minus, plus, removeBtn, swapBtn, buzzLockBtn);
           row.append(info, controls);
 
           if (p.team === "left") leftTeam.appendChild(row);
@@ -461,7 +512,7 @@ document.addEventListener("DOMContentLoaded", () => {
         box.className = "noTeamPlayer";
 
         const nm = document.createElement("span");
-        nm.textContent = `${p.name} | ✅${score}`;
+        nm.textContent = `${p.name} | ✅${score}${p.buzzLocked ? " | 🔒" : ""}`;
 
         const btns = document.createElement("div");
         btns.className = "noTeamBtns";
@@ -486,7 +537,11 @@ document.addEventListener("DOMContentLoaded", () => {
         plus.textContent = "➕";
         plus.onclick = () => socket.emit("adjustScore", { id, delta: 1 });
 
-        btns.append(leftBtn, rightBtn, kickBtn, minus, plus);
+        const buzzLockBtn = document.createElement("button");
+        buzzLockBtn.textContent = p.buzzLocked ? "فتح الزر 🔓" : "قفل الزر 🔒";
+        buzzLockBtn.onclick = () => socket.emit("togglePlayerBuzzLock", id);
+
+        btns.append(leftBtn, rightBtn, kickBtn, minus, plus, buzzLockBtn);
         box.append(nm, btns);
         noTeam.appendChild(box);
       });
@@ -496,7 +551,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // =========================
-  // شكل الزر حسب الحالة
+  // شكل الزر
   // =========================
   function setBuzzVisual(state) {
     if (!buzzBtn) return;
@@ -505,6 +560,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (myTeam !== "left" && myTeam !== "right") {
       buzzBtn.classList.add("buzz-red");
+      buzzBtn.disabled = true;
+      return;
+    }
+
+    const me = myId && allPlayers[myId] ? allPlayers[myId] : null;
+    if (me && me.buzzLocked) {
+      buzzBtn.classList.add("buzz-grey");
       buzzBtn.disabled = true;
       return;
     }
@@ -545,6 +607,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (myTeam !== "left" && myTeam !== "right") return alert("اختر فريق أولاً 👈");
       if (!playerName) return alert("اكتب اسمك أولاً");
 
+      const me = myId && allPlayers[myId] ? allPlayers[myId] : null;
+      if (me && me.buzzLocked) return alert("زرّك مقفول من المقدم 🔒");
+
       if (lastBuzzState) {
         if (lastBuzzState.locked) return;
         if (lastBuzzState.disabledTeams && lastBuzzState.disabledTeams[myTeam]) return alert("فريقك مقفل حالياً 🔒");
@@ -555,6 +620,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // =========================
+  // تم ضغط الزر
+  // =========================
   socket.on("buzzedInfo", (info) => {
     if (!info || !info.name) return;
 
@@ -594,40 +662,46 @@ document.addEventListener("DOMContentLoaded", () => {
   if (lockRightBtn) lockRightBtn.onclick = () => socket.emit("lockTeamBuzz", "right");
   if (openRightBtn) openRightBtn.onclick = () => socket.emit("openTeamBuzz", "right");
 
-  if (leftWidgetToggleMode) {
-    leftWidgetToggleMode.onclick = () => socket.emit("toggleTeamWidgetMode", "left");
-  }
-  if (rightWidgetToggleMode) {
-    rightWidgetToggleMode.onclick = () => socket.emit("toggleTeamWidgetMode", "right");
+  if (leftPointToggleVisible) {
+    leftPointToggleVisible.onclick = () => socket.emit("toggleTeamPointVisible", "left");
   }
 
-  if (leftWidgetToggleVisible) {
-    leftWidgetToggleVisible.onclick = () => socket.emit("toggleTeamWidgetVisible", "left");
+  if (rightPointToggleVisible) {
+    rightPointToggleVisible.onclick = () => socket.emit("toggleTeamPointVisible", "right");
   }
-  if (rightWidgetToggleVisible) {
-    rightWidgetToggleVisible.onclick = () => socket.emit("toggleTeamWidgetVisible", "right");
+
+  if (leftTimerToggleVisible) {
+    leftTimerToggleVisible.onclick = () => socket.emit("toggleTeamTimerVisible", "left");
+  }
+
+  if (rightTimerToggleVisible) {
+    rightTimerToggleVisible.onclick = () => socket.emit("toggleTeamTimerVisible", "right");
   }
 
   socket.on("teamWidgets", (widgets) => {
     if (!widgets) return;
 
-    renderOneTeamWidget(
-      "left",
-      widgets.left,
-      leftWidgetBox,
-      leftWidgetView,
-      gLeftWidgetBox,
-      gLeftWidgetView
-    );
+    renderTeamWidgets("left", widgets.left, {
+      hostPointBox: leftPointBox,
+      hostPointView: leftPointView,
+      hostTimerBox: leftTimerBox,
+      hostTimerView: leftTimerView,
+      guestPointBox: gLeftPointBox,
+      guestPointView: gLeftPointView,
+      guestTimerBox: gLeftTimerBox,
+      guestTimerView: gLeftTimerView,
+    });
 
-    renderOneTeamWidget(
-      "right",
-      widgets.right,
-      rightWidgetBox,
-      rightWidgetView,
-      gRightWidgetBox,
-      gRightWidgetView
-    );
+    renderTeamWidgets("right", widgets.right, {
+      hostPointBox: rightPointBox,
+      hostPointView: rightPointView,
+      hostTimerBox: rightTimerBox,
+      hostTimerView: rightTimerView,
+      guestPointBox: gRightPointBox,
+      guestPointView: gRightPointView,
+      guestTimerBox: gRightTimerBox,
+      guestTimerView: gRightTimerView,
+    });
   });
 
   socket.on("judgeResult", () => {
@@ -910,7 +984,7 @@ document.addEventListener("DOMContentLoaded", () => {
     reader.readAsDataURL(file);
   });
 
-  // ===== HOST buttons =====
+  // ===== أزرار الهوست =====
   if (isHost && btnAddLink) {
     btnAddLink.onclick = () => {
       const u = prompt("حط رابط الموقع:");
@@ -931,7 +1005,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // ===== Screen Share (Host) =====
+  // ===== مشاركة الشاشة =====
   async function beginShareFlow() {
     try {
       if (!window.isSecureContext) {
